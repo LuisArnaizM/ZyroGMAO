@@ -37,5 +37,13 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        
+        # Definir mapeos de nombres de variables de entorno
+        field_aliases = {
+            "debug": "APP_DEBUG",
+            "host": "APP_HOST",
+            "port": "APP_PORT",
+            "cors_origins": "APP_CORS_ORIGINS"
+        }
 
 settings = Settings()

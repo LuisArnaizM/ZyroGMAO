@@ -4,7 +4,7 @@ from typing import List
 
 from app.database.postgres import get_db
 from app.schemas.machine import MachineCreate, MachineRead, MachineUpdate
-from app.crud.machine import (
+from app.controllers.machine import (
     create_machine, 
     get_machine, 
     get_machines, 

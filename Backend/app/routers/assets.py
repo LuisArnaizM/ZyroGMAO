@@ -4,7 +4,7 @@ from typing import List
 
 from app.database.postgres import get_db
 from app.schemas.asset import AssetCreate, AssetRead, AssetUpdate
-from app.crud.asset import create_asset, get_asset, get_assets, update_asset, delete_asset
+from app.controllers.asset import create_asset, get_asset, get_assets, update_asset, delete_asset
 from app.auth.dependencies import get_current_user, require_role
 
 router = APIRouter(prefix="/assets", tags=["Assets"])

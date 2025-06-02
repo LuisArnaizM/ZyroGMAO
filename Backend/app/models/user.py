@@ -1,8 +1,7 @@
-from sqlalchemy import Column, String, Integer, Enum as SqlEnum
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String, Enum
+from sqlalchemy.orm import relationship
+from app.database.postgres import Base
 import enum
-
-Base = declarative_base()
 
 class UserRole(str, enum.Enum):
     admin = "Admin"
@@ -12,8 +11,15 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
-
+    
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    role = Column(SqlEnum(UserRole), default=UserRole.tecnico)
+    role = Column(String, default=UserRole.consultor, nullable=False)
+    
+    # Relaciones
+    assets = relationship("Asset", back_populates="responsible")
+    machines = relationship("Machine", back_populates="responsible")
+    assigned_tasks = relationship("Task", back_populates="assignee", foreign_keys="Task.assigned_to")
+    created_tasks = relationship("Task", back_populates="creator", foreign_keys="Task.created_by_id")
+    maintenances = relationship("Maintenance", back_populates="user")

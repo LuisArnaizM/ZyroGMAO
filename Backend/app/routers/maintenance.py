@@ -4,7 +4,7 @@ from typing import List
 
 from app.database.postgres import get_db
 from app.schemas.maintenance import MaintenanceCreate, MaintenanceRead, MaintenanceUpdate
-from app.crud.maintenance import (
+from app.controllers.maintenance import (
     create_maintenance, 
     get_maintenance, 
     get_all_maintenance,

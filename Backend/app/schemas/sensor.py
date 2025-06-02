@@ -1,17 +1,50 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional, Union  # Eliminado 'Float' de aquí
 
-class SensorDataIn(BaseModel):
+# Esquema para la configuración de sensores en PostgreSQL
+class SensorConfigCreate(BaseModel):
     asset_id: int
+    name: str
     sensor_type: str
-    value: Any
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    location: Optional[str] = None
+    units: Optional[str] = None
+    min_value: Optional[float] = None  
+    max_value: Optional[float] = None  
 
-class SensorDataOut(SensorDataIn):
+class SensorConfigRead(BaseModel):
     id: int
-
-class SensorUpdate(BaseModel):
+    asset_id: int
+    name: str
     sensor_type: str
-    value: Any
+    location: Optional[str] = None
+    units: Optional[str] = None
+    min_value: Optional[float] = None  
+    max_value: Optional[float] = None  
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class SensorConfigUpdate(BaseModel):
+    name: Optional[str] = None
+    sensor_type: Optional[str] = None
+    location: Optional[str] = None
+    units: Optional[str] = None
+    min_value: Optional[float] = None  
+    max_value: Optional[float] = None  
+
+# Esquemas para los datos de lecturas de sensores en MongoDB
+class SensorReadingCreate(BaseModel):
+    sensor_id: int  # Referencia al ID del sensor en PostgreSQL
+    asset_id: int   # Referencia al ID del asset
+    value: Union[float, int, str]  # Puede ser cualquiera de estos tipos
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class SensorReadingRead(SensorReadingCreate):
+    id: str  # MongoDB ObjectId como string
+
+# Mantén estos alias para compatibilidad si es necesario
+SensorIn = SensorReadingCreate
+SensorOut = SensorReadingRead

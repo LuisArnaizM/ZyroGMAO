@@ -8,8 +8,6 @@ from app.config import settings
 
 load_dotenv()
 
-
-
 def create_token(data: dict, expires_delta: Optional[timedelta] = None) -> Tuple[str, datetime]:
     """
     Crea un token JWT con los datos proporcionados y la fecha de expiración.

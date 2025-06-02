@@ -11,4 +11,4 @@ passlib[bcrypt]
 pytest
 pytest-asyncio
 httpx
-bson
+asyncpg

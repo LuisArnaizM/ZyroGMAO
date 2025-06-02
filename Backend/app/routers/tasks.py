@@ -4,7 +4,7 @@ from typing import List
 
 from app.database.postgres import get_db
 from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
-from app.crud.task import create_task, get_task, get_tasks, update_task, delete_task
+from app.controllers.task import create_task, get_task, get_tasks, update_task, delete_task
 from app.auth.dependencies import get_current_user, require_role
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])

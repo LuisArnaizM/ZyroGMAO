@@ -4,7 +4,7 @@ from typing import List
 
 from app.database.postgres import get_db
 from app.schemas.workorder import WorkOrderCreate, WorkOrderRead, WorkOrderUpdate
-from app.crud.workorder import (
+from app.controllers.workorder import (
     create_workorder, 
     get_workorder, 
     get_workorders,

@@ -4,7 +4,7 @@ from typing import List
 
 from app.database.postgres import get_db
 from app.schemas.user import UserCreate, UserRead, UserUpdate
-from app.crud.user import (
+from app.controllers.user import (
     create_user, 
     get_user, 
     get_users, 
