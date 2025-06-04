@@ -48,11 +48,12 @@ async def read_sensor_config(
         raise HTTPException(status_code=404, detail="Sensor configuration not found")
     return sensor
 
-@router.get("/config/asset/{asset_id}", response_model=List[SensorConfigRead])
+@router.get("/config/{asset_id}", response_model=List[SensorConfigRead])
 async def read_sensors_by_asset_config(
     asset_id: int,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    search: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Obtener todas las configuraciones de sensores para un activo"""
@@ -60,7 +61,8 @@ async def read_sensors_by_asset_config(
         db=db, 
         asset_id=asset_id,
         page=page,
-        page_size=page_size
+        page_size=page_size,
+        search=search
     )
 
 @router.put("/config/{sensor_id}", response_model=SensorConfigRead)

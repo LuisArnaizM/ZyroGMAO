@@ -35,11 +35,12 @@ async def read_machine(
 
 @router.get("/", response_model=List[MachineRead])
 async def read_machines(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    page: int = Query(1, ge=1, description="Página actual"),
+    page_size: int = Query(20, ge=1, le=100, description="Número de elementos por página"),
+    search: str = Query(None, description="Término de búsqueda para filtrar activos"),
     db: AsyncSession = Depends(get_db)
 ):
-    return await get_machines(db=db, skip=skip, limit=limit)
+    return await get_machines(db=db, page=page, page_size=page_size, search=search)
 
 @router.put("/{machine_id}", response_model=MachineRead)
 async def update_existing_machine(

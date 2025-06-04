@@ -36,11 +36,12 @@ async def read_maintenance(
 
 @router.get("/", response_model=List[MaintenanceRead])
 async def read_all_maintenance(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    page: int = Query(1, ge=1, description="Página actual"),
+    page_size: int = Query(20, ge=1, le=100, description="Número de elementos por página"),
+    search: str = Query(None, description="Término de búsqueda para filtrar activos"),
     db: AsyncSession = Depends(get_db)
 ):
-    return await get_all_maintenance(db=db, skip=skip, limit=limit)
+    return await get_all_maintenance(db=db, page=page, page_size=page_size, search=search)
 
 @router.get("/asset/{asset_id}", response_model=List[MaintenanceRead])
 async def read_maintenance_by_asset(

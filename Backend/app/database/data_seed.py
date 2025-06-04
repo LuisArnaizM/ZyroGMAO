@@ -1,292 +1,180 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.database.postgres import Base
+import asyncio
+import os
+from sqlalchemy import create_engine, text, select, func
 from app.config import settings
-from passlib.context import CryptContext
-
-# Importar todos los modelos para que SQLAlchemy los reconozca
+from app.database.postgres import Base
 from app.models.user import User, UserRole
-from app.models.asset import Asset
-from app.models.machine import Machine
-from app.models.task import Task
-from app.models.failure import Failure
-from app.models.maintenance import Maintenance
-from app.models.workorder import WorkOrder
-from app.models.sensor import Sensor
+from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def db_is_empty():
-    from sqlalchemy import create_engine, select, func
-    from app.config import settings
-    from app.models.user import User
-    
+    """Verificar si la base de datos está vacía (no tiene usuarios)"""
     sync_url = settings.postgres_url.replace('+asyncpg', '')
     engine = create_engine(sync_url)
     
     try:
         with engine.connect() as connection:
             # Verificar si la tabla users existe y tiene datos
-            result = connection.execute(select(func.count()).select_from(User.__table__))
+            result = connection.execute(text("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'users'"))
+            table_exists = result.scalar() > 0
+            
+            if not table_exists:
+                return True  # La tabla no existe, la BD está vacía
+            
+            # La tabla existe, verificar si tiene datos
+            result = connection.execute(text("SELECT COUNT(*) FROM users"))
             count = result.scalar()
-            return count == 0
-    except Exception:
-        # Si hay error (ej: tabla no existe), consideramos que está vacía
-        return True
-    
-def init_db():
-    # Usar una URL de conexión sincrónica para la inicialización
-    sync_url = settings.postgres_url.replace('+asyncpg', '')
-    engine = create_engine(sync_url)
-    
-    # Crear todas las tablas
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    
-    # Crear una sesión para insertar datos iniciales
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = SessionLocal()
-    
-    try:
-        # Crear usuarios por defecto
-        admin = User(
-            email="admin@example.com",
-            hashed_password=pwd_context.hash("admin123"),
-            role=UserRole.admin
-        )
-        
-        supervisor = User(
-            email="supervisor@example.com",
-            hashed_password=pwd_context.hash("supervisor123"),
-            role=UserRole.supervisor
-        )
-        
-        tecnico = User(
-            email="tecnico@example.com",
-            hashed_password=pwd_context.hash("tecnico123"),
-            role=UserRole.tecnico
-        )
-        
-        consultor = User(
-            email="consultor@example.com",
-            hashed_password=pwd_context.hash("consultor123"),
-            role=UserRole.consultor
-        )
-        
-        db.add_all([admin, supervisor, tecnico, consultor])
-        db.commit()
-        
-        # Crear máquinas de ejemplo
-        machine1 = Machine(
-            name="Línea de Producción A",
-            description="Línea principal de ensamblaje",
-            location="Nave 1",
-            responsible_id=2  # supervisor
-        )
-        
-        machine2 = Machine(
-            name="Línea de Producción B",
-            description="Línea secundaria de ensamblaje",
-            location="Nave 2",
-            responsible_id=2  # supervisor
-        )
-        
-        machine3 = Machine(
-            name="Robot Soldador",
-            description="Robot de soldadura automática",
-            location="Nave 1",
-            responsible_id=3  # tecnico
-        )
-        
-        db.add_all([machine1, machine2, machine3])
-        db.commit()
-        
-        # Crear activos de ejemplo
-        asset1 = Asset(
-            name="Motor Principal",
-            description="Motor eléctrico 30kW",
-            location="Línea A - Sección 1",
-            responsible_id=3,  # tecnico
-            machine_id=1  # Línea de Producción A
-        )
-        
-        asset2 = Asset(
-            name="Transportador",
-            description="Cinta transportadora",
-            location="Línea A - Sección 2",
-            responsible_id=3,  # tecnico
-            machine_id=1
-        )
-        
-        asset3 = Asset(
-            name="Panel de Control",
-            description="Panel principal de control",
-            location="Línea B - Sección 1",
-            responsible_id=2,  # supervisor
-            machine_id=2
-        )
-        
-        asset4 = Asset(
-            name="Brazo Robótico",
-            description="Brazo robótico para soldadura",
-            location="Nave 1 - Celda 3",
-            responsible_id=3,  # tecnico
-            machine_id=3
-        )
-        
-        db.add_all([asset1, asset2, asset3, asset4])
-        db.commit()
-        
-        # Crear sensores de ejemplo
-        sensor1 = Sensor(
-            asset_id=1,  # Motor Principal
-            name="Temperatura Motor",
-            sensor_type="temperature",
-            location="Estator",
-            units="°C",
-            min_value=30.0,
-            max_value=80.0
-        )
-
-        sensor2 = Sensor(
-            asset_id=1,  # Motor Principal
-            name="Vibración Motor",
-            sensor_type="vibration",
-            location="Carcasa",
-            units="mm/s",
-            min_value=0.0,
-            max_value=5.0
-        )
-
-        sensor3 = Sensor(
-            asset_id=2,  # Transportador
-            name="Velocidad Transportador",
-            sensor_type="rpm",
-            location="Eje motor",
-            units="RPM",
-            min_value=100.0,
-            max_value=2000.0
-        )
-
-        sensor4 = Sensor(
-            asset_id=4,  # Brazo Robótico
-            name="Posición Eje Z",
-            sensor_type="position",
-            location="Actuador",
-            units="mm",
-            min_value=0.0,
-            max_value=500.0
-        )
-
-        db.add_all([sensor1, sensor2, sensor3, sensor4])
-        db.commit()
-        # Crear fallos de ejemplo
-        failure1 = Failure(
-            asset_id=1,  # Motor Principal
-            description="Ruido anormal en el motor",
-            status="open"
-        )
-        
-        failure2 = Failure(
-            asset_id=2,  # Transportador
-            description="La cinta se detiene intermitentemente",
-            status="in_progress"
-        )
-        
-        failure3 = Failure(
-            asset_id=4,  # Brazo Robótico
-            description="Error de calibración en eje Z",
-            status="closed"
-        )
-        
-        db.add_all([failure1, failure2, failure3])
-        db.commit()
-        
-        # Crear tareas de ejemplo
-        task1 = Task(
-            name="Revisar Motor Principal",
-            description="Inspección completa del motor por ruido anormal",
-            assigned_to=3,  # tecnico
-            machine_id=1,  # Línea de Producción A
-            due_date="2025-06-10T10:00:00",
-            created_by_id=2  # supervisor
-        )
-        
-        task2 = Task(
-            name="Mantenimiento de cinta transportadora",
-            description="Revisión y lubricación de cinta transportadora",
-            assigned_to=3,  # tecnico
-            machine_id=1,  # Línea de Producción A
-            due_date="2025-06-15T14:00:00",
-            created_by_id=2  # supervisor
-        )
-        
-        task3 = Task(
-            name="Calibración de robot",
-            description="Calibrar ejes del robot soldador",
-            assigned_to=3,  # tecnico
-            machine_id=3,  # Robot Soldador
-            due_date="2025-06-08T09:00:00",
-            created_by_id=1  # admin
-        )
-        
-        db.add_all([task1, task2, task3])
-        db.commit()
-        
-        # Crear registros de mantenimiento
-        maintenance1 = Maintenance(
-            asset_id=2,  # Transportador
-            user_id=3,  # tecnico
-            description="Mantenimiento preventivo de cinta transportadora",
-            status="pending"
-        )
-        
-        maintenance2 = Maintenance(
-            asset_id=4,  # Brazo Robótico
-            user_id=3,  # tecnico
-            description="Calibración y ajuste de brazo robótico",
-            status="completed"
-        )
-        
-        db.add_all([maintenance1, maintenance2])
-        db.commit()
-        
-        # Crear órdenes de trabajo
-        workorder1 = WorkOrder(
-            task_id=1,  # Revisar Motor Principal
-            maintenance_id=1,  # Relacionado con el primer fallo
-            description="Orden de trabajo para revisión de motor",
-            status="pending",
-            created_by="supervisor@example.com"
-        )
-        
-        workorder2 = WorkOrder(
-            task_id=2,  # Mantenimiento de cinta transportadora
-            maintenance_id=2,  # Relacionado con el segundo fallo
-            description="Orden de trabajo para mantenimiento de transportador",
-            status="in_progress",
-            created_by="admin@example.com"
-        )
-        
-        workorder3 = WorkOrder(
-            task_id=3,  # Calibración de robot
-            maintenance_id=3,  # Relacionado con el tercer fallo
-            description="Orden de trabajo para calibración de robot",
-            status="completed",
-            created_by="supervisor@example.com"
-        )
-        
-        db.add_all([workorder1, workorder2, workorder3])
-        db.commit()
-
+            return count == 0  # Si count es 0, la BD está vacía
     except Exception as e:
-        db.rollback()
-        print(f"Error during database initialization: {e}")
-        raise
-    finally:
-        db.close()
+        print(f"Error verificando si la base de datos está vacía: {e}")
+        return True  # Si hay error, consideramos que está vacía para inicializarla
+
+def init_db(drop_tables=False):
+    """Función de compatibilidad para main.py"""
+    init_postgres_sync()
+
+def init_postgres_sync():
+    """Inicializar la base de datos PostgreSQL de forma síncrona"""
+    # Usar URL síncrona para SQLAlchemy
+    sync_url = settings.postgres_url.replace('+asyncpg', '')
+    
+    # Crear motor de base de datos
+    engine = create_engine(sync_url)
+    with engine.connect() as connection:
+        # Primero verificar si la base de datos existe
+        try:
+            # Crear explícitamente el esquema 'public' y otorgar permisos
+            connection.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
+            connection.execute(text("GRANT ALL ON SCHEMA public TO postgres;"))
+            connection.execute(text("GRANT ALL ON SCHEMA public TO public;"))
+            connection.commit()
+            print("✅ Esquema 'public' verificado/creado correctamente")
+        except Exception as e:
+            print(f"⚠️ Error al verificar/crear el esquema: {e}")
+    
+    # Crear todas las tablas definidas en los modelos
+    Base.metadata.create_all(bind=engine)
+    print("✅ Tablas creadas en PostgreSQL")
+    
+    from sqlalchemy.orm import Session
+    with Session(engine) as session:
+        try:
+            user_count = session.query(User).count()
+            if user_count > 0:
+                print(f"👤 La base de datos ya tiene {user_count} usuarios. No se crearán usuarios de ejemplo.")
+                # Verificar si existe el superusuario 'admin'
+                admin_exists = session.query(User).filter(User.email == "admin").first() is not None
+                
+                if not admin_exists:
+                    print("🔑 Creando superusuario 'admin'...")
+                    superadmin = User(
+                        email="admin",  # Email simple que servirá como nombre de usuario
+                        hashed_password=pwd_context.hash("admin"),  # Contraseña simple
+                        role=UserRole.admin  # Asignar rol de administrador
+                    )
+                    session.add(superadmin)
+                    session.commit()
+                    print("✅ Superusuario 'admin' creado exitosamente")
+                return
+                
+            # Crear usuarios de ejemplo
+            print("🔑 Creando usuarios de ejemplo...")
+            
+            # Superusuario con credenciales simples
+            superadmin = User(
+                email="admin",
+                hashed_password=pwd_context.hash("admin"),
+                role=UserRole.admin
+            )
+            
+            # Usuarios adicionales
+            admin = User(
+                email="admin@example.com",
+                hashed_password=pwd_context.hash("admin123"),
+                role=UserRole.admin
+            )
+            
+            supervisor = User(
+                email="supervisor@example.com",
+                hashed_password=pwd_context.hash("supervisor123"),
+                role=UserRole.supervisor
+            )
+            
+            tecnico = User(
+                email="tecnico@example.com",
+                hashed_password=pwd_context.hash("tecnico123"),
+                role=UserRole.tecnico
+            )
+            
+            consultor = User(
+                email="consultor@example.com",
+                hashed_password=pwd_context.hash("consultor123"),
+                role=UserRole.consultor
+            )
+            
+            # Añadir todos los usuarios
+            session.add_all([superadmin, admin, supervisor, tecnico, consultor])
+            session.commit()
+            print("👥 Usuarios creados exitosamente")
+            
+        except Exception as e:
+            session.rollback()
+            print(f"❌ Error al crear usuarios: {e}")
+            raise
+
+async def init_mongodb():
+    """Inicializar la base de datos MongoDB"""
+    from app.database.mongodb import mongodb
+    
+    # Limpiar colecciones existentes
+    await mongodb.sensor_readings.drop()
+    
+    # Insertar datos de ejemplo para sensores
+    sensor_data = [
+        {
+            "sensor_id": 1,
+            "asset_id": 1,
+            "value": 42.5,
+            "timestamp": "2023-06-01T10:00:00"
+        },
+        {
+            "sensor_id": 2,
+            "asset_id": 1,
+            "value": 12.3,
+            "timestamp": "2023-06-01T10:05:00"
+        },
+        {
+            "sensor_id": 3,
+            "asset_id": 2,
+            "value": 1750,
+            "timestamp": "2023-06-01T10:00:00"
+        },
+        {
+            "sensor_id": 1,
+            "asset_id": 3,
+            "value": 220.5,
+            "timestamp": "2023-06-01T10:00:00"
+        },
+        {
+            "sensor_id": 4,
+            "asset_id": 4,
+            "value": 45.2,
+            "timestamp": "2023-06-01T10:00:00"
+        }
+    ]
+    
+    await mongodb.sensor_readings.insert_many(sensor_data)
+    print("📊 Datos insertados en MongoDB")
+
+async def main():
+    print("🚀 Inicializando bases de datos...")
+    
+    # PostgreSQL (síncrono)
+    init_postgres_sync()
+    
+    # MongoDB (asíncrono)
+    await init_mongodb()
 
 if __name__ == "__main__":
-    print("Initializing database...")
-    init_db()
-    print("Database initialized successfully!")
+    asyncio.run(main())

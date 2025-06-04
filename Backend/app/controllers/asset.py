@@ -1,16 +1,24 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models.asset import Asset
+from app.models.machine import Machine
 from app.schemas.asset import AssetCreate, AssetRead, AssetUpdate
 
 async def create_asset(db: AsyncSession, asset_in: AssetCreate):
     """Create a new asset in the database"""
+    
+    # Verificar si machine_id existe (si se proporciona)
+    if asset_in.machine_id:
+        machine = await db.execute(select(Machine).where(Machine.id == asset_in.machine_id))
+        if not machine.scalar_one_or_none():
+            raise ValueError(f"Machine with ID {asset_in.machine_id} does not exist")
+    
+    # Continuar con la creación si todo está bien
     new_asset = Asset(**asset_in.model_dump())
     db.add(new_asset)
     await db.commit()
     await db.refresh(new_asset)
     return new_asset
-
 async def get_asset(db: AsyncSession, asset_id: int):
     """Get an asset by ID"""
     result = await db.execute(select(Asset).where(Asset.id == asset_id))

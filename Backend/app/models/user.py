@@ -17,8 +17,8 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default=UserRole.consultor, nullable=False)
     
-    # Relaciones
-    assets = relationship("Asset", back_populates="responsible")
+    # Usar strings en las relaciones para evitar dependencias circulares
+    assets = relationship("Asset", foreign_keys="Asset.responsible_id", back_populates="responsible")
     machines = relationship("Machine", back_populates="responsible")
     assigned_tasks = relationship("Task", back_populates="assignee", foreign_keys="Task.assigned_to")
     created_tasks = relationship("Task", back_populates="creator", foreign_keys="Task.created_by_id")

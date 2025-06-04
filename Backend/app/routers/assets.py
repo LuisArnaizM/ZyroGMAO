@@ -29,11 +29,12 @@ async def read_asset(
 
 @router.get("/", response_model=List[AssetRead])
 async def read_assets(
-    skip: int = Query(0, ge=0), 
-    limit: int = Query(100, ge=1, le=1000),
+    page: int = Query(1, ge=1, description="Página actual"),
+    page_size: int = Query(20, ge=1, le=100, description="Número de elementos por página"),
+    search: str = Query(None, description="Término de búsqueda para filtrar activos"),
     db: AsyncSession = Depends(get_db)
 ):
-    return await get_assets(db=db, skip=skip, limit=limit)
+    return await get_assets(db=db, page=page, page_size=page_size, search=search)
 
 @router.put("/{asset_id}", response_model=AssetRead)
 async def update_existing_asset(

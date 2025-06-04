@@ -44,12 +44,13 @@ async def read_user(
 
 @router.get("/", response_model=List[UserRead])
 async def read_users(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    page: int = Query(1, ge=1, description="Página actual"),
+    page_size: int = Query(20, ge=1, le=100, description="Número de elementos por página"),
+    search: str = Query(None, description="Término de búsqueda para filtrar activos"),
     db: AsyncSession = Depends(get_db),
     user = Depends(require_role(["Admin", "Supervisor"]))
 ):
-    return await get_users(db=db, skip=skip, limit=limit)
+    return await get_users(db=db, page=page, page_size=page_size, search=search)
 
 @router.put("/{user_id}", response_model=UserRead)
 async def update_existing_user(

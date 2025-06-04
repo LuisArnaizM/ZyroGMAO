@@ -7,14 +7,14 @@ class Asset(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    description = Column(String)  # Añadido campo descripción
+    description = Column(String) 
     location = Column(String)
     responsible_id = Column(Integer, ForeignKey("users.id"))
-    machine_id = Column(Integer, ForeignKey("machines.id"))  # Nueva relación con máquinas
+    machine_id = Column(Integer, ForeignKey("machines.id"))  
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relaciones
+    # Usar strings en las relaciones
     responsible = relationship("User", back_populates="assets")
     machine = relationship("Machine", back_populates="assets")
     failures = relationship("Failure", back_populates="asset")

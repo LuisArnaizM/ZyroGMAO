@@ -19,11 +19,17 @@ router = APIRouter(prefix="/workorders", tags=["WorkOrders"])
 @router.post("/", response_model=WorkOrderRead)
 async def create_new_workorder(
     workorder_in: WorkOrderCreate,
+    page: int = Query(1, ge=1, description="Página actual"),
+    page_size: int = Query(20, ge=1, le=100, description="Número de elementos por página"),
+    search: str = Query(None, description="Término de búsqueda para filtrar activos"),
     db: AsyncSession = Depends(get_db),
     user = Depends(require_role(["Admin", "Supervisor", "Tecnico"]))
 ):
     return await create_workorder(
-        db=db, 
+        db=db,
+        page=page,
+        page_size=page_size,
+        search=search,
         workorder_in=workorder_in, 
         created_by=user["email"]
     )
