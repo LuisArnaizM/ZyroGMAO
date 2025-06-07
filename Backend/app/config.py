@@ -1,49 +1,83 @@
-from pydantic_settings import BaseSettings
+import os
 from typing import List, Optional
-from dotenv import load_dotenv
-
-# Cargar variables de entorno desde .env
-load_dotenv()
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    # Información de la aplicación
-    app_name: str = "GMAO System"
-    app_version: str = "1.0.0"
-    app_description: str = "Sistema GMAO para mantenimiento industrial"
-    debug: bool = False
-    host: str = "0.0.0.0"
-    port: int = 8000
+    # Información del proyecto - Agregar las variables que faltan
+    PROJECT_NAME: str = "Industrial Maintenance Management API"
+    VERSION: str = "1.0.0"
+    API_V1_STR: str = "/api/v1"
     
-    # Lista de orígenes permitidos para CORS
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080"]
+    # Variables adicionales del .env que estaban faltando
+    APP_NAME: str = "GMAO System"
+    APP_VERSION: str = "1.0.0"
+    APP_DESCRIPTION: str = "Sistema GMAO para mantenimiento industrial"
+    DEBUG: bool = True
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
     
-    # Configuración de autenticación
-    secret_key: str
-    algorithm: str = "HS256"
-    access_token_expire_minutes: int = 15
-    refresh_token_expire_days: int = 7
+    # Base de datos
+    POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "localhost")
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "gmao")
+    POSTGRES_PORT: str = os.getenv("POSTGRES_PORT", "5432")
     
-    # Configuración de bases de datos - Producción
-    postgres_url: str
-    mongodb_url: str
-    mongodb_db: str
+    # Agregar POSTGRES_URL que está en tu .env
+    POSTGRES_URL: Optional[str] = None
     
-    # Configuración de bases de datos - Testing
-    test_postgres_url: Optional[str] = None
-    test_mongodb_url: Optional[str] = None
-    test_mongodb_db: Optional[str] = None
+    # MongoDB para datos de sensores
+    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+    MONGODB_DB: str = os.getenv("MONGODB_DB", "sensor_data")
+    
+    # Seguridad
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production")
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    
+    # CORS - Agregar la variable que falta
+    CORS_ORIGINS: str = '["http://localhost:3000", "http://localhost:8080", "http://localhost:8000"]'
+    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8080", "http://localhost:8000"]
+    
+    # Email (para futuras implementaciones)
+    SMTP_TLS: bool = True
+    SMTP_PORT: Optional[int] = None
+    SMTP_HOST: Optional[str] = None
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    
+    @property
+    def database_url(self) -> str:
+        # Usar POSTGRES_URL si está definida, sino construir la URL
+        if self.POSTGRES_URL:
+            return self.POSTGRES_URL
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    
+    @property
+    def mongodb_url(self):
+        return self.MONGODB_URL
+    
+    @property
+    def mongodb_db(self):
+        return self.MONGODB_DB
+    
+    @property
+    def access_token_expire_minutes(self) -> int:
+        return self.ACCESS_TOKEN_EXPIRE_MINUTES
+    
+    @property
+    def refresh_token_expire_days(self) -> int:
+        return self.REFRESH_TOKEN_EXPIRE_DAYS
     
     class Config:
         env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        
-        # Definir mapeos de nombres de variables de entorno
-        field_aliases = {
-            "debug": "APP_DEBUG",
-            "host": "APP_HOST",
-            "port": "APP_PORT",
-            "cors_origins": "APP_CORS_ORIGINS"
-        }
+        case_sensitive = True
+        # Permitir variables extra para mayor flexibilidad
+        extra = "ignore"
 
 settings = Settings()
+
+# Función helper para mantener compatibilidad
+def get_database_url() -> str:
+    return settings.database_url

@@ -1,69 +1,122 @@
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, assets, failures, machines, maintenance, sensors, tasks, users, workorders
-from app.config import settings
-import asyncio
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from contextlib import asynccontextmanager
 import logging
-from app.database.data_seed import db_is_empty, init_db
+
+from app.config import settings
+from app.database.postgres import check_connection
+from app.routers import (
+    auth, users, organization, assets, sensors, 
+    failures, maintenance, tasks, workorders, components
+)
+
+# Configurar logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Gestor de ciclo de vida de la aplicación.
-    Se ejecuta al arrancar y detener la aplicación.
+    Gestiona el ciclo de vida de la aplicación.
     """
-    # Código que se ejecuta al iniciar la aplicación
-    logging.info("🚀 Iniciando aplicación GMAO...")
+    # Startup
+    logger.info("🚀 Iniciando aplicación...")
     
-    try:
-        # Verificar si la base de datos está vacía
-        is_empty = db_is_empty()
-        
-        if is_empty:
-            logging.info("💾 La base de datos está vacía. Inicializando...")
-            # Inicializar PostgreSQL de forma síncrona
-            init_db()
-            logging.info("✅ Base de datos inicializada correctamente")
-        else:
-            logging.info("✅ Base de datos ya contiene datos. No es necesario inicializar.")
-    except Exception as e:
-        logging.error(f"❌ Error verificando/inicializando la base de datos: {e}")
+    # Verificar conexión a la base de datos
+    if await check_connection():
+        logger.info("✅ Conexión a base de datos establecida")
+    else:
+        logger.error("❌ No se pudo conectar a la base de datos")
+        raise HTTPException(status_code=500, detail="Database connection failed")
     
-    yield  # Aquí la aplicación está en ejecución
+    logger.info("✅ Aplicación iniciada correctamente")
     
-    # Código que se ejecuta al detener la aplicación
-    logging.info("👋 Cerrando aplicación GMAO...")
+    yield
+    
+    # Shutdown
+    logger.info("🛑 Cerrando aplicación...")
 
-# Crear aplicación FastAPI con metadatos desde la configuración
+# Crear aplicación FastAPI
 app = FastAPI(
-    title=settings.app_name,
-    description=settings.app_description,
-    version=settings.app_version,
-    debug=settings.debug,
-    lifespan=lifespan,
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    description="API para gestión de mantenimiento industrial con IoT",
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan
 )
 
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Middleware de hosts confiables (deshabilitado en desarrollo)
+# TODO: Habilitar en producción con configuración correcta
+# if not settings.DEBUG and settings.BACKEND_CORS_ORIGINS:
+#     allowed_hosts = []
+#     for origin in settings.BACKEND_CORS_ORIGINS:
+#         if "://" in origin:
+#             host = origin.split("://")[1]
+#             allowed_hosts.append(host)
+#         else:
+#             allowed_hosts.append(origin)
+#     
+#     app.add_middleware(
+#         TrustedHostMiddleware,
+#         allowed_hosts=allowed_hosts
+#     )
+
 # Incluir routers
-app.include_router(auth.router)
-app.include_router(assets.router)
-app.include_router(failures.router)
-app.include_router(machines.router)
-app.include_router(maintenance.router)
-app.include_router(sensors.router)
-app.include_router(tasks.router)
-app.include_router(users.router)
-app.include_router(workorders.router)
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth")
+app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users")
+app.include_router(organization.router, prefix=f"{settings.API_V1_STR}/organization")
+app.include_router(assets.router, prefix=f"{settings.API_V1_STR}/assets")
+app.include_router(components.router, prefix=f"{settings.API_V1_STR}/components")
+app.include_router(sensors.router, prefix=f"{settings.API_V1_STR}/sensors")
+app.include_router(failures.router, prefix=f"{settings.API_V1_STR}/failures")
+app.include_router(maintenance.router, prefix=f"{settings.API_V1_STR}/maintenance")
+app.include_router(tasks.router, prefix=f"{settings.API_V1_STR}/tasks")
+app.include_router(workorders.router, prefix=f"{settings.API_V1_STR}/workorders")
+
+@app.get("/")
+async def root():
+    """
+    Endpoint raíz que proporciona información básica de la API.
+    """
+    return {
+        "message": "Industrial Maintenance Management API",
+        "version": settings.VERSION,
+        "docs_url": "/docs",
+        "health_check": "/health"
+    }
+
+@app.get("/health")
+async def health_check():
+    """
+    Endpoint de verificación de salud de la aplicación.
+    """
+    db_status = await check_connection()
+    
+    return {
+        "status": "healthy" if db_status else "unhealthy",
+        "database": "connected" if db_status else "disconnected",
+        "version": settings.VERSION
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )

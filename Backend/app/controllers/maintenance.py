@@ -4,13 +4,17 @@ from app.models.maintenance import Maintenance
 from app.schemas.maintenance import MaintenanceCreate, MaintenanceRead, MaintenanceUpdate
 from datetime import datetime
 
-async def create_maintenance(db: AsyncSession, maintenance_in: MaintenanceCreate):
+async def create_maintenance(db: AsyncSession, maintenance_in: MaintenanceCreate, organization_id: int):
     """Create a new maintenance record"""
     new_maintenance = Maintenance(
         asset_id=maintenance_in.asset_id,
         user_id=maintenance_in.user_id,
         description=maintenance_in.description,
-        status="pending",
+        maintenance_type=maintenance_in.maintenance_type,
+        scheduled_date=maintenance_in.scheduled_date,
+        workorder_id=maintenance_in.workorder_id,
+        status="scheduled",
+        organization_id=organization_id,  # Agregar organization_id
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
     )
@@ -19,33 +23,28 @@ async def create_maintenance(db: AsyncSession, maintenance_in: MaintenanceCreate
     await db.refresh(new_maintenance)
     return new_maintenance
 
-async def get_maintenance(db: AsyncSession, maintenance_id: int):
-    """Get a maintenance record by ID"""
-    result = await db.execute(select(Maintenance).where(Maintenance.id == maintenance_id))
+async def get_maintenance(db: AsyncSession, maintenance_id: int, organization_id: int):
+    """Get a maintenance record by ID within organization"""
+    result = await db.execute(
+        select(Maintenance).where(
+            Maintenance.id == maintenance_id,
+            Maintenance.organization_id == organization_id
+        )
+    )
     return result.scalar_one_or_none()
 
 async def get_all_maintenance(
     db: AsyncSession,
+    organization_id: int,
     page: int = 1,
     page_size: int = 20,
     search: str = None
 ):
-    """
-    Get all maintenance records with pagination and search capability
-    
-    Parameters:
-    - db: Database session
-    - page: Page number (starts from 1)
-    - page_size: Number of records per page
-    - search: Search string to filter maintenance by description or status
-    """
-    # Calculate offset based on page and page_size
+    """Get all maintenance records with pagination, search capability and organization filter"""
     offset = (page - 1) * page_size
     
-    # Build the base query
-    query = select(Maintenance)
+    query = select(Maintenance).where(Maintenance.organization_id == organization_id)
     
-    # Apply search filter if provided
     if search:
         search_term = f"%{search}%"
         query = query.where(
@@ -53,41 +52,51 @@ async def get_all_maintenance(
             (Maintenance.status.ilike(search_term))
         )
     
-    # Apply pagination
     query = query.offset(offset).limit(page_size)
-    
-    # Execute query
     result = await db.execute(query)
     return result.scalars().all()
 
-async def get_maintenance_by_asset(db: AsyncSession, asset_id: int):
-    """Get all maintenance records for a specific asset"""
-    result = await db.execute(select(Maintenance).where(Maintenance.asset_id == asset_id))
+async def get_maintenance_by_asset(db: AsyncSession, asset_id: int, organization_id: int):
+    """Get all maintenance records for a specific asset within organization"""
+    result = await db.execute(
+        select(Maintenance).where(
+            Maintenance.asset_id == asset_id,
+            Maintenance.organization_id == organization_id
+        )
+    )
     return result.scalars().all()
 
-async def update_maintenance(db: AsyncSession, maintenance_id: int, maintenance_in: MaintenanceUpdate):
-    """Update a maintenance record"""
-    result = await db.execute(select(Maintenance).where(Maintenance.id == maintenance_id))
+async def update_maintenance(db: AsyncSession, maintenance_id: int, maintenance_in: MaintenanceUpdate, organization_id: int):
+    """Update a maintenance record within organization"""
+    result = await db.execute(
+        select(Maintenance).where(
+            Maintenance.id == maintenance_id,
+            Maintenance.organization_id == organization_id
+        )
+    )
     maintenance = result.scalar_one_or_none()
     
     if maintenance is None:
         return None
     
-    # Update only fields that are provided
     update_data = maintenance_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(maintenance, key, value)
     
-    # Update the updated_at timestamp
     maintenance.updated_at = datetime.utcnow()
     
     await db.commit()
     await db.refresh(maintenance)
     return maintenance
 
-async def delete_maintenance(db: AsyncSession, maintenance_id: int):
-    """Delete a maintenance record"""
-    result = await db.execute(select(Maintenance).where(Maintenance.id == maintenance_id))
+async def delete_maintenance(db: AsyncSession, maintenance_id: int, organization_id: int):
+    """Delete a maintenance record within organization"""
+    result = await db.execute(
+        select(Maintenance).where(
+            Maintenance.id == maintenance_id,
+            Maintenance.organization_id == organization_id
+        )
+    )
     maintenance = result.scalar_one_or_none()
     
     if maintenance is None:

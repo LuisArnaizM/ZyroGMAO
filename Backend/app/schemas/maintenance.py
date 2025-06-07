@@ -1,20 +1,38 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
+from .user import UserReference
 
 class MaintenanceCreate(BaseModel):
+    description: str
     asset_id: int
     user_id: int
-    description: str
+    maintenance_type: str = "preventive"
+    scheduled_date: Optional[datetime] = None
+    workorder_id: Optional[int] = None
 
 class MaintenanceRead(BaseModel):
     id: int
-    asset_id: int
-    user_id: int
     description: str
     status: str
+    maintenance_type: str
+    asset_id: int
+    user_id: int
+    workorder_id: Optional[int] = None
+    organization_id: int
+    scheduled_date: Optional[datetime] = None
+    completed_date: Optional[datetime] = None
+    duration_hours: Optional[float] = None
+    cost: Optional[float] = None
+    notes: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class MaintenanceReadWithUser(MaintenanceRead):
+    technician: Optional[UserReference] = None
     
     class Config:
         from_attributes = True
@@ -22,4 +40,11 @@ class MaintenanceRead(BaseModel):
 class MaintenanceUpdate(BaseModel):
     description: Optional[str] = None
     status: Optional[str] = None
+    maintenance_type: Optional[str] = None
     user_id: Optional[int] = None
+    scheduled_date: Optional[datetime] = None
+    completed_date: Optional[datetime] = None
+    duration_hours: Optional[float] = None
+    cost: Optional[float] = None
+    notes: Optional[str] = None
+    workorder_id: Optional[int] = None

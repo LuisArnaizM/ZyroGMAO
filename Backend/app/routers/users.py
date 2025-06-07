@@ -14,7 +14,7 @@ from app.controllers.user import (
 )
 from app.auth.dependencies import get_current_user, require_role
 
-router = APIRouter(prefix="/users", tags=["Users"])
+router = APIRouter(tags=["Users"])
 
 @router.post("/", response_model=UserRead)
 async def create_new_user(
