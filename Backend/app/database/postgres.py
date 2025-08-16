@@ -15,7 +15,6 @@ Base = declarative_base()
 # Engine de la base de datos
 engine = create_async_engine(
     get_database_url(),
-    echo=True,  # Para desarrollo, cambiar a False en producción
     pool_pre_ping=True,
     pool_recycle=300,
 )
@@ -45,8 +44,7 @@ async def create_tables():
     Crea todas las tablas definidas en los modelos.
     """
     try:
-        # Importar todos los modelos para que se registren con Base
-        from app.models import user, organization, asset, sensor, failure, maintenance, task, workorder, sensordata
+        from app.models import user, organization, asset, sensor, failure, maintenance, task, workorder, sensordata, department
         
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -62,8 +60,7 @@ async def drop_tables():
     Elimina todas las tablas de la base de datos.
     """
     try:
-        # Importar todos los modelos para que se registren con Base
-        from app.models import user, organization, asset, sensor, failure, maintenance, task, workorder, sensordata
+        from app.models import user, organization, asset, sensor, failure, maintenance, task, workorder, sensordata, department
         
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)

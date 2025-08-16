@@ -53,37 +53,6 @@ async def list_organizations(
         }
     }
 
-@router.get("/current", response_model=OrganizationRead)
-async def get_current_organization_endpoint(
-    organization = Depends(get_current_organization)
-):
-    """Obtener la organización del usuario actual"""
-    return organization
-
-@router.get("/current/stats", response_model=OrganizationStats)
-async def get_current_organization_stats(
-    organization = Depends(get_current_organization),
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_org_admin())
-):
-    """Obtener estadísticas de la organización actual"""
-    stats = await get_organization_stats(db, organization.id)
-    if not stats:
-        raise HTTPException(status_code=404, detail="Organization not found")
-    return stats
-
-@router.get("/slug/{slug}", response_model=OrganizationRead)
-async def get_organization_by_slug_endpoint(
-    slug: str,
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role(["Admin"]))
-):
-    """Obtener organización por slug (solo super admin)"""
-    organization = await get_organization_by_slug(db, slug)
-    if not organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
-    return organization
-
 @router.get("/{org_id}", response_model=OrganizationRead)
 async def get_organization_endpoint(
     org_id: int,
@@ -128,18 +97,6 @@ async def update_current_organization(
     if not updated_org:
         raise HTTPException(status_code=404, detail="Organization not found")
     return updated_org
-
-@router.delete("/{org_id}")
-async def delete_organization_endpoint(
-    org_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role(["Admin"]))
-):
-    """Eliminar (desactivar) organización (solo super admin)"""
-    success = await delete_organization(db, org_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Organization not found")
-    return {"message": "Organization deactivated successfully"}
 
 @router.get("/{org_id}/stats", response_model=OrganizationStats)
 async def get_organization_stats_endpoint(

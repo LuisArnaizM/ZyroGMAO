@@ -42,51 +42,6 @@ async def refresh_token(
     """Obtener nuevo access token usando refresh token"""
     return await refresh_access_token(refresh_request.refresh_token, db)
 
-@router.post("/register", response_model=UserRead)
-async def register_user(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
-    """Registrar nuevo usuario"""
-    # Verificar si username o email ya existen
-    result = await db.execute(
-        select(User).where(
-            or_(User.email == user_in.email, User.username == user_in.username)
-        )
-    )
-    existing_user = result.scalar_one_or_none()
-
-    if existing_user:
-        if existing_user.email == user_in.email:
-            raise HTTPException(status_code=400, detail="Email already registered")
-        else:
-            raise HTTPException(status_code=400, detail="Username already taken")
-
-    new_user = User(
-        username=user_in.username,
-        first_name=user_in.first_name,
-        last_name=user_in.last_name,
-        email=user_in.email,
-        hashed_password=pwd_context.hash(user_in.password),
-        role=user_in.role,
-        is_active=1
-    )
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
-    return new_user
-
-@router.get("/me", response_model=UserProfile)
-async def get_me(
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Obtener información completa del usuario actual"""
-    result = await db.execute(select(User).where(User.id == user["id"]))
-    db_user = result.scalar_one_or_none()
-    
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return UserProfile.from_user(db_user)
-
 @router.put("/change-password")
 async def change_user_password(
     change_request: ChangePasswordRequest,

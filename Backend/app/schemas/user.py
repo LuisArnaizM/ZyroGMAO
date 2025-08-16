@@ -10,6 +10,7 @@ class UserCreate(BaseModel):
     password: str
     role: str
     organization_id: Optional[int] = None  # Para super admin que crea usuarios
+    department_id: Optional[int] = None
 
 class UserRead(BaseModel):
     id: int
@@ -20,6 +21,7 @@ class UserRead(BaseModel):
     role: str
     is_active: int
     organization_id: Optional[int] = None
+    department_id: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     
@@ -40,6 +42,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[int] = None
     organization_id: Optional[int] = None  # Solo para super admin
+    department_id: Optional[int] = None
 
 class UserLogin(BaseModel):
     login: str
@@ -70,6 +73,7 @@ class UserProfile(BaseModel):
     role: str
     is_active: int
     organization_id: Optional[int] = None
+    department_id: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     full_name: str
@@ -89,6 +93,7 @@ class UserProfile(BaseModel):
             role=user.role,
             is_active=user.is_active,
             organization_id=user.organization_id,
+            department_id=getattr(user, 'department_id', None),
             created_at=user.created_at,
             updated_at=user.updated_at,
             full_name=f"{user.first_name} {user.last_name}",

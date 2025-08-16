@@ -2,33 +2,43 @@ version: '3.9'
 
 services:
   api:
-    build: .
+    image: gmao_api:latest
+    container_name: api
     ports:
       - "${APP_PORT}:8000"
     env_file:
       - .env
     depends_on:
-      - db
-      - mongo
+      db:
+        condition: service_healthy
+      mongo:
+        condition: service_started
     volumes:
       - ./:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --reload
-
+    command: ["python", "-m", "uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
   db:
     image: postgres:15
+    container_name: postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_DB: ${POSTGRES_DB:-gmao}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gmao
+      PGUSER: postgres
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gmao"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   mongo:
     image: mongo:6
+    container_name: mongo
     ports:
-      - "${MONGODB_PORT:-27017}:27017"
+      - "27017:27017"
     volumes:
       - mongodata:/data/db
 

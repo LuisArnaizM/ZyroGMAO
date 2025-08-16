@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import or_
+from sqlalchemy.orm import selectinload
 from app.models.user import User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from passlib.context import CryptContext
@@ -27,6 +28,7 @@ async def create_user(db: AsyncSession, user_in: UserCreate):
         email=user_in.email,
         hashed_password=pwd_context.hash(user_in.password),
         role=user_in.role,
+    department_id=user_in.department_id,
         is_active=1  # Activo por defecto
     )
     db.add(new_user)
@@ -35,10 +37,13 @@ async def create_user(db: AsyncSession, user_in: UserCreate):
     return new_user
 
 async def get_user(db: AsyncSession, user_id: int):
-    """Get a user by ID"""
-    result = await db.execute(select(User).where(User.id == user_id))
+    """Get a user by ID with organization loaded"""
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.organization))  # ← AGREGAR ESTA LÍNEA
+        .where(User.id == user_id)
+    )
     return result.scalar_one_or_none()
-
 async def get_user_by_email(db: AsyncSession, email: str):
     """Get a user by email"""
     result = await db.execute(select(User).where(User.email == email))

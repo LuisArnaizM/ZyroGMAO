@@ -26,3 +26,4 @@ class Organization(Base):
     maintenance_records = relationship("Maintenance", back_populates="organization")
     workorders = relationship("WorkOrder", back_populates="organization")
     sensors = relationship("Sensor", back_populates="organization")
+    departments = relationship("Department", back_populates="organization")

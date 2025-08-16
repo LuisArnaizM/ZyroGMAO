@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.database.postgres import get_db
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.user import UserCreate, UserRead, UserUpdate, UserProfile
 from app.controllers.user import (
     create_user, 
     get_user, 
@@ -27,9 +27,15 @@ async def create_new_user(
         raise HTTPException(status_code=400, detail="Email already registered")
     return new_user
 
-@router.get("/me", response_model=UserRead)
-async def read_users_me(user = Depends(get_current_user)):
-    return {"email": user["email"], "role": user["role"]}
+@router.get("/me", response_model=UserProfile)
+async def read_users_me(
+    user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)    
+):
+    db_user = await get_user(db=db, user_id = user["id"])
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserProfile.from_user(db_user)
 
 @router.get("/{user_id}", response_model=UserRead)
 async def read_user(

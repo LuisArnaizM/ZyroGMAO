@@ -5,10 +5,11 @@ from contextlib import asynccontextmanager
 import logging
 
 from app.config import settings
-from app.database.postgres import check_connection
+from app.database.postgres import check_connection, create_tables
+from app.database.data_seed import seed_database
 from app.routers import (
     auth, users, organization, assets, sensors, 
-    failures, maintenance, tasks, workorders, components
+    failures, maintenance, tasks, workorders, components, department
 )
 
 # Configurar logging
@@ -29,6 +30,21 @@ async def lifespan(app: FastAPI):
     # Verificar conexión a la base de datos
     if await check_connection():
         logger.info("✅ Conexión a base de datos establecida")
+        
+        try:
+            # Crear tablas si no existen
+            logger.info("📝 Verificando/creando tablas...")
+            await create_tables()
+            logger.info("✅ Tablas verificadas/creadas exitosamente")
+            
+            # Poblar con datos iniciales si es necesario
+            logger.info("🌱 Verificando datos iniciales...")
+            await seed_database()
+            logger.info("✅ Datos iniciales verificados")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error durante la inicialización de datos: {e}")
+            # No fallar el startup por esto, las tablas podrían ya existir
     else:
         logger.error("❌ No se pudo conectar a la base de datos")
         raise HTTPException(status_code=500, detail="Database connection failed")
@@ -52,7 +68,7 @@ app = FastAPI(
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,6 +96,7 @@ app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users")
 app.include_router(organization.router, prefix=f"{settings.API_V1_STR}/organization")
 app.include_router(assets.router, prefix=f"{settings.API_V1_STR}/assets")
 app.include_router(components.router, prefix=f"{settings.API_V1_STR}/components")
+app.include_router(department.router, prefix=f"{settings.API_V1_STR}/department")
 app.include_router(sensors.router, prefix=f"{settings.API_V1_STR}/sensors")
 app.include_router(failures.router, prefix=f"{settings.API_V1_STR}/failures")
 app.include_router(maintenance.router, prefix=f"{settings.API_V1_STR}/maintenance")

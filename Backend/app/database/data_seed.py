@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, func  # Agregar text aquí
+from sqlalchemy import text, func
 from app.database.postgres import AsyncSessionLocal
 from app.models.user import User
 from app.models.organization import Organization

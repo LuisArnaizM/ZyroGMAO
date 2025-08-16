@@ -26,7 +26,7 @@ async def create_new_failure(
     return await create_failure(
         db=db,
         failure_in=failure_in,
-        reported_by=user.id,
+        reported_by=user["id"],
         organization_id=organization.id
     )
 

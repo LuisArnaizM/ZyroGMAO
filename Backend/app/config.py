@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     # Información del proyecto - Agregar las variables que faltan
     PROJECT_NAME: str = "Industrial Maintenance Management API"
     VERSION: str = "1.0.0"
-    API_V1_STR: str = "/api/v1"
+    API_V1_STR: str = "/v1"
     
     # Variables adicionales del .env que estaban faltando
     APP_NAME: str = "GMAO System"
@@ -17,18 +17,20 @@ class Settings(BaseSettings):
     PORT: int = 8000
     
     # Base de datos
-    POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "localhost")
+    POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "db")  # Cambiado de localhost a db
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "gmao")
     POSTGRES_PORT: str = os.getenv("POSTGRES_PORT", "5432")
     
-    # Agregar POSTGRES_URL que está en tu .env
+    # URLs para Docker y local
     POSTGRES_URL: Optional[str] = None
+    POSTGRES_URL_DOCKER: Optional[str] = None
     
     # MongoDB para datos de sensores
-    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-    MONGODB_DB: str = os.getenv("MONGODB_DB", "sensor_data")
+    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://mongo:27017")  # Cambiado de localhost a mongo
+    MONGODB_URL_DOCKER: str = os.getenv("MONGODB_URL_DOCKER", "mongodb://mongo:27017")
+    MONGODB_DB: str = os.getenv("MONGODB_DB", "gmao_sensors")
     
     # Seguridad
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production")
@@ -36,9 +38,30 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
-    # CORS - Agregar la variable que falta
-    CORS_ORIGINS: str = '["http://localhost:3000", "http://localhost:8080", "http://localhost:8000"]'
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8080", "http://localhost:8000"]
+    # CORS - Configuración mejorada para desarrollo
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", '["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:8080", "http://localhost:8000"]')
+    
+    # Lista de orígenes permitidos - construida dinámicamente
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Convierte la string de CORS_ORIGINS a lista"""
+        import json
+        try:
+            return json.loads(self.CORS_ORIGINS)
+        except:
+            # Fallback con orígenes de desarrollo comunes
+            return [
+                "http://localhost:3000",
+                "http://localhost:3001", 
+                "http://localhost:3002",
+                "http://localhost:8080",
+                "http://localhost:8000",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:3001",
+                "http://127.0.0.1:3002"
+            ]
+    
+    BACKEND_CORS_ORIGINS: List[str] = []  # Se inicializa en __post_init__
     
     # Email (para futuras implementaciones)
     SMTP_TLS: bool = True
@@ -47,15 +70,26 @@ class Settings(BaseSettings):
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     
+    def model_post_init(self, __context) -> None:
+        """Inicializa BACKEND_CORS_ORIGINS después de la creación del objeto"""
+        self.BACKEND_CORS_ORIGINS = self.cors_origins_list
+    
     @property
     def database_url(self) -> str:
-        # Usar POSTGRES_URL si está definida, sino construir la URL
-        if self.POSTGRES_URL:
+        # Priorizar POSTGRES_URL_DOCKER si está definida (para Docker)
+        if self.POSTGRES_URL_DOCKER:
+            return self.POSTGRES_URL_DOCKER
+        # Usar POSTGRES_URL si está definida
+        elif self.POSTGRES_URL:
             return self.POSTGRES_URL
+        # Sino construir la URL usando POSTGRES_SERVER (que será 'db' en Docker)
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
     @property
     def mongodb_url(self):
+        # Usar MONGODB_URL_DOCKER si está disponible, sino usar MONGODB_URL
+        if self.MONGODB_URL_DOCKER:
+            return self.MONGODB_URL_DOCKER
         return self.MONGODB_URL
     
     @property

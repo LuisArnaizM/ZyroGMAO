@@ -27,7 +27,7 @@ async def create_new_workorder(
     return await create_workorder(
         db=db,
         workorder_in=workorder_in,
-        created_by=user.id,
+        created_by=user["id"],
         organization_id=organization.id
     )
 

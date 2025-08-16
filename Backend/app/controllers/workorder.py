@@ -4,7 +4,7 @@ from app.models.workorder import WorkOrder
 from app.models.asset import Asset
 from app.models.failure import Failure
 from app.schemas.workorder import WorkOrderCreate, WorkOrderRead, WorkOrderUpdate
-from datetime import datetime
+from datetime import datetime, timezone
 
 async def create_workorder(db: AsyncSession, workorder_in: WorkOrderCreate, created_by: int, organization_id: int):
     """Create a new work order"""
@@ -30,7 +30,18 @@ async def create_workorder(db: AsyncSession, workorder_in: WorkOrderCreate, crea
         if not failure.scalar_one_or_none():
             raise ValueError(f"Failure with ID {workorder_in.failure_id} does not exist in this organization")
     
+    def to_naive_utc(dt: datetime | None) -> datetime | None:
+        if dt is None:
+            return None
+        # Convert aware -> naive UTC
+        if dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None:
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+
     workorder_data = workorder_in.model_dump()
+    # Normalize datetime fields to naive UTC for columns without timezone
+    if workorder_data.get('scheduled_date'):
+        workorder_data['scheduled_date'] = to_naive_utc(workorder_data['scheduled_date'])
     workorder_data['created_by'] = created_by
     workorder_data['organization_id'] = organization_id
     
@@ -123,12 +134,27 @@ async def update_workorder(db: AsyncSession, workorder_id: int, workorder_in: Wo
         return None
     
     update_data = workorder_in.model_dump(exclude_unset=True)
+
+    def to_naive_utc(dt: datetime | None) -> datetime | None:
+        if dt is None:
+            return None
+        if dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None:
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
     
     # Lógica para fechas automáticas
     if update_data.get('status') == 'in_progress' and not workorder.started_date:
         update_data['started_date'] = datetime.utcnow()
     elif update_data.get('status') == 'completed' and not workorder.completed_date:
         update_data['completed_date'] = datetime.utcnow()
+
+    # Normalize possible provided datetime fields
+    if 'scheduled_date' in update_data:
+        update_data['scheduled_date'] = to_naive_utc(update_data['scheduled_date'])
+    if 'started_date' in update_data and isinstance(update_data['started_date'], datetime):
+        update_data['started_date'] = to_naive_utc(update_data['started_date'])
+    if 'completed_date' in update_data and isinstance(update_data['completed_date'], datetime):
+        update_data['completed_date'] = to_naive_utc(update_data['completed_date'])
     
     for key, value in update_data.items():
         setattr(workorder, key, value)

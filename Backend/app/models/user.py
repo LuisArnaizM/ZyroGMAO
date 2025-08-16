@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from enum import Enum
@@ -9,27 +9,28 @@ class UserRole(str, Enum):
     supervisor = "Supervisor"
     tecnico = "Tecnico"
     consultor = "Consultor"
-    org_admin = "OrgAdmin"
 
 class User(Base):
     __tablename__ = "users"
-
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True, nullable=False)
+    username = Column(String(50), unique=True, nullable=False)
     first_name = Column(String(50), nullable=False)
     last_name = Column(String(50), nullable=False)
-    email = Column(String(100), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(100), nullable=False)
-    role = Column(String(20), nullable=False, default=UserRole.consultor)
-    is_active = Column(Integer, default=1)  # 1 = activo, 0 = inactivo
+    email = Column(String(100), unique=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
     # Foreign Key para organización
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     
     # Relationships
     organization = relationship("Organization", back_populates="users")
+    department = relationship("Department", back_populates="users", foreign_keys=[department_id])
+    # Departments where the user is manager
+    managed_departments = relationship("Department", back_populates="manager", foreign_keys="Department.manager_id")
     assigned_tasks = relationship("Task", foreign_keys="Task.assigned_to", back_populates="assignee")
     created_tasks = relationship("Task", foreign_keys="Task.created_by_id", back_populates="creator")
     responsible_assets = relationship("Asset", foreign_keys="Asset.responsible_id", back_populates="responsible")

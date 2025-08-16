@@ -5,7 +5,8 @@ from .user import UserReference
 
 class FailureCreate(BaseModel):
     description: str
-    asset_id: int
+    asset_id: Optional[int] = None
+    component_id: Optional[int] = None
     severity: str = "medium"
 
 class FailureRead(BaseModel):
@@ -13,7 +14,8 @@ class FailureRead(BaseModel):
     description: str
     status: str
     severity: str
-    asset_id: int
+    asset_id: Optional[int] = None
+    component_id: Optional[int] = None
     reported_by: int
     organization_id: int
     reported_date: datetime

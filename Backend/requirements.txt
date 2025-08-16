@@ -13,3 +13,5 @@ pytest-asyncio
 httpx
 asyncpg
 psycopg2-binary
+python-multipart
+pydantic_settings

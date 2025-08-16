@@ -2,23 +2,39 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models.failure import Failure
 from app.models.asset import Asset
+from app.models.component import Component
 from app.schemas.failure import FailureCreate, FailureRead, FailureUpdate
 from datetime import datetime
 
 async def create_failure(db: AsyncSession, failure_in: FailureCreate, reported_by: int, organization_id: int):
     """Create a new failure report"""
     
-    # Verificar que el asset existe en la organización
-    asset = await db.execute(
-        select(Asset).where(
-            Asset.id == failure_in.asset_id,
-            Asset.organization_id == organization_id
+    # Validar que al menos uno de los IDs esté presente
+    if not failure_in.asset_id and not failure_in.component_id:
+        raise ValueError("Debe proporcionar asset_id o component_id")
+
+    # Verificar que el asset o component existe en la organización
+    if failure_in.asset_id:
+        asset = await db.execute(
+            select(Asset).where(
+                Asset.id == failure_in.asset_id,
+                Asset.organization_id == organization_id
+            )
         )
-    )
-    if not asset.scalar_one_or_none():
-        raise ValueError(f"Asset with ID {failure_in.asset_id} does not exist in this organization")
+        if not asset.scalar_one_or_none():
+            raise ValueError(f"Asset with ID {failure_in.asset_id} does not exist in this organization")
+
+    if failure_in.component_id:
+        component = await db.execute(
+            select(Component).where(
+                Component.id == failure_in.component_id,
+                Component.organization_id == organization_id
+            )
+        )
+        if not component.scalar_one_or_none():
+            raise ValueError(f"Component with ID {failure_in.component_id} does not exist in this organization")
     
-    failure_data = failure_in.model_dump()
+    failure_data = failure_in.model_dump(exclude_none=True)
     failure_data['reported_by'] = reported_by
     failure_data['organization_id'] = organization_id
     failure_data['status'] = 'reported'

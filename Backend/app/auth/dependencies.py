@@ -8,9 +8,12 @@ from app.database.postgres import get_db
 from app.models.user import User
 from app.models.organization import Organization
 from typing import Optional
+from app.config import settings
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login",
+    scheme_name="JWT"
+)
 # Lista para almacenar tokens inválidos (logout)
 # En producción, usar Redis o base de datos
 blacklisted_tokens = set()
@@ -31,6 +34,7 @@ async def get_current_user(
     
     try:
         payload = decode_token(token)
+
         email: str = payload.get("sub")
         username: str = payload.get("username")
         role: str = payload.get("role")
@@ -38,7 +42,6 @@ async def get_current_user(
         first_name: str = payload.get("first_name")
         last_name: str = payload.get("last_name")
         organization_id: Optional[int] = payload.get("organization_id")
-        
         if email is None:
             raise credentials_exception
             

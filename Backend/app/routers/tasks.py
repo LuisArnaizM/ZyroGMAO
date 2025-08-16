@@ -27,7 +27,7 @@ async def create_new_task(
     return await create_task(
         db=db,
         task_in=task_in,
-        created_by_id=user.id,
+        created_by_id=user["id"],
         organization_id=organization.id
     )
 

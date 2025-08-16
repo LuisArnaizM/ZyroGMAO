@@ -32,7 +32,7 @@ async def read_asset(
 @router.get("/", response_model=List[AssetRead])
 async def read_assets(
     page: int = Query(1, ge=1, description="Página actual"),
-    page_size: int = Query(20, ge=1, le=100, description="Número de elementos por página"),
+    page_size: int = Query(20, ge=1, description="Número de elementos por página"),
     search: str = Query(None, description="Término de búsqueda para filtrar activos"),
     db: AsyncSession = Depends(get_db),
     organization = Depends(get_current_organization)
