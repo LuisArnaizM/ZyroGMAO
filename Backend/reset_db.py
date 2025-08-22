@@ -10,7 +10,6 @@ from app.config import settings
 
 # Importar TODOS los modelos AQUÍ al nivel del módulo
 from app.models.user import User
-from app.models.organization import Organization
 from app.models.component import Component
 from app.models.asset import Asset
 from app.models.sensor import Sensor
@@ -25,8 +24,11 @@ async def force_clean_database():
     Limpia completamente la base de datos eliminando y recreando el esquema.
     """
     try:
-        # Convertir URL de SQLAlchemy a asyncpg
-        database_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        # Construir URL para asyncpg; si el host es "db" (docker) usar localhost cuando se ejecuta local
+        host = settings.POSTGRES_SERVER or "localhost"
+        if host == "db":
+            host = "localhost"
+        database_url = f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{host}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
         
         # Conectar directamente a PostgreSQL
         conn = await asyncpg.connect(database_url)
@@ -60,7 +62,7 @@ async def main():
         from app.database.data_seed import seed_database
         
         # Los modelos ya están importados al nivel del módulo
-        print(f"📋 Modelos registrados: {[User.__name__, Organization.__name__, Component.__name__, Asset.__name__]}")
+        print(f"📋 Modelos registrados: {[User.__name__, Component.__name__, Asset.__name__]}")
         
         # Crear tablas nuevamente
         print("📝 Creando tablas...")

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 
 from app.database.postgres import get_db
 from app.schemas.user import UserCreate, UserRead, UserUpdate, UserProfile
@@ -52,11 +52,13 @@ async def read_user(
 async def read_users(
     page: int = Query(1, ge=1, description="Página actual"),
     page_size: int = Query(20, ge=1, le=100, description="Número de elementos por página"),
-    search: str = Query(None, description="Término de búsqueda para filtrar activos"),
+    search: Optional[str] = Query(None, description="Término de búsqueda"),
+    role: Optional[str] = Query(None, description="Filtrar por rol exacto"),
+    is_active: Optional[bool] = Query(None, description="true activo, false inactivo"),
     db: AsyncSession = Depends(get_db),
     user = Depends(require_role(["Admin", "Supervisor"]))
 ):
-    return await get_users(db=db, page=page, page_size=page_size, search=search)
+    return await get_users(db=db, page=page, page_size=page_size, search=search, role=role, is_active=is_active)
 
 @router.put("/{user_id}", response_model=UserRead)
 async def update_existing_user(

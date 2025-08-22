@@ -6,9 +6,14 @@ from sqlalchemy.future import select
 from app.auth.security import decode_token
 from app.database.postgres import get_db
 from app.models.user import User
-from app.models.organization import Organization
+from typing import Optional
 from typing import Optional
 from app.config import settings
+from jose import JWTError
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database.postgres import get_db
+from sqlalchemy.future import select
+from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login",
@@ -41,10 +46,8 @@ async def get_current_user(
         user_id: int = payload.get("user_id")
         first_name: str = payload.get("first_name")
         last_name: str = payload.get("last_name")
-        organization_id: Optional[int] = payload.get("organization_id")
         if email is None:
             raise credentials_exception
-            
     except JWTError:
         raise credentials_exception
     
@@ -61,9 +64,47 @@ async def get_current_user(
         "username": username,
         "first_name": first_name,
         "last_name": last_name,
-        "role": role,
-        "organization_id": organization_id,
+    "role": role,
         "full_name": f"{first_name} {last_name}"
+    }
+
+
+async def get_optional_user(request: Request, db: AsyncSession = Depends(get_db)):
+    """Return user dict if Authorization header present and token valid, else None."""
+    auth = request.headers.get("authorization")
+    if not auth:
+        return None
+
+    parts = auth.split()
+    if len(parts) != 2:
+        return None
+    token = parts[1]
+
+    try:
+        payload = decode_token(token)
+        email: str = payload.get("sub")
+        user_id: int = payload.get("user_id")
+        first_name: str = payload.get("first_name")
+        last_name: str = payload.get("last_name")
+        username: str = payload.get("username")
+        role: str = payload.get("role")
+        if email is None:
+            return None
+    except JWTError:
+        return None
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None or user.is_active == 0:
+        return None
+    return {
+        "id": user_id,
+        "email": email,
+        "username": username,
+        "first_name": first_name,
+        "last_name": last_name,
+        "role": role,
+        "full_name": f"{first_name} {last_name}",
     }
 
 def require_role(roles: list):
@@ -80,51 +121,12 @@ def logout_token(token: str):
     """Añadir token a la lista negra"""
     blacklisted_tokens.add(token)
 
-async def get_current_organization(
-    user = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-) -> Organization:
-    """Obtener la organización del usuario actual"""
-    if not user.get("organization_id"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is not associated with any organization"
-        )
-    
-    result = await db.execute(
-        select(Organization).where(
-            Organization.id == user["organization_id"],
-            Organization.is_active == True
-        )
-    )
-    organization = result.scalar_one_or_none()
-    
-    if not organization:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Organization not found or inactive"
-        )
-    
-    return organization
+async def get_current_organization():
+    # Organización eliminada del modelo. Mantener stub por compatibilidad si hay endpoints que aún la declaran.
+    raise HTTPException(status_code=410, detail="Organization scope removed")
 
-async def get_organization_from_domain(
-    request: Request,
-    db: AsyncSession = Depends(get_db)
-) -> Optional[Organization]:
-    """Obtener organización basada en el dominio de la request"""
-    host = request.headers.get("host", "").split(":")[0]  # Remover puerto si existe
-    
-    if not host:
-        return None
-    
-    result = await db.execute(
-        select(Organization).where(
-            Organization.domain == host,
-            Organization.is_active == True
-        )
-    )
-    
-    return result.scalar_one_or_none()
+async def get_organization_from_domain():
+    return None
 
 def require_org_admin():
     """Requerir que el usuario sea administrador de organización o sistema"""
@@ -138,15 +140,6 @@ def require_org_admin():
     return dependency
 
 def require_same_organization():
-    """Requerir que el usuario pertenezca a la misma organización"""
-    def dependency(
-        user = Depends(get_current_user),
-        organization: Organization = Depends(get_current_organization)
-    ):
-        if user["organization_id"] != organization.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: different organization"
-            )
-        return user, organization
+    def dependency(user = Depends(get_current_user)):
+        raise HTTPException(status_code=410, detail="Organization scope removed")
     return dependency

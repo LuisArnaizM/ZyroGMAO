@@ -5,7 +5,6 @@ Este archivo importa todos los modelos para asegurar que se registren con SQLAlc
 """
 
 from app.models.user import User
-from app.models.organization import Organization
 from app.models.asset import Asset
 from app.models.component import Component
 from app.models.sensor import Sensor
@@ -14,10 +13,11 @@ from app.models.failure import Failure
 from app.models.maintenance import Maintenance
 from app.models.task import Task
 from app.models.workorder import WorkOrder
+from app.models.inventory import InventoryItem, TaskUsedComponent
+from app.models.department import Department
 
 __all__ = [
     "User",
-    "Organization",
     "Asset",
     "Component",
     "Sensor",
@@ -26,4 +26,8 @@ __all__ = [
     "Maintenance",
     "Task",
     "WorkOrder"
+    ,
+    "InventoryItem",
+    "TaskUsedComponent",
+    "Department"
 ]

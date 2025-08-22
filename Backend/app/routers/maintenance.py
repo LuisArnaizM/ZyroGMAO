@@ -12,7 +12,7 @@ from app.controllers.maintenance import (
     update_maintenance, 
     delete_maintenance
 )
-from app.auth.dependencies import get_current_user, require_role, get_current_organization
+from app.auth.dependencies import get_current_user, require_role
 
 router = APIRouter(tags=["Maintenance"])
 
@@ -20,18 +20,16 @@ router = APIRouter(tags=["Maintenance"])
 async def create_new_maintenance(
     maintenance_in: MaintenanceCreate,
     db: AsyncSession = Depends(get_db),
-    user = Depends(require_role(["Admin", "Supervisor", "Tecnico"])),
-    organization = Depends(get_current_organization)
+    user = Depends(require_role(["Admin", "Supervisor", "Tecnico"]))
 ):
-    return await create_maintenance(db=db, maintenance_in=maintenance_in, organization_id=organization.id)
+    return await create_maintenance(db=db, maintenance_in=maintenance_in)
 
 @router.get("/{maintenance_id}", response_model=MaintenanceRead)
 async def read_maintenance(
     maintenance_id: int,
-    db: AsyncSession = Depends(get_db),
-    organization = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
-    maintenance = await get_maintenance(db=db, maintenance_id=maintenance_id, organization_id=organization.id)
+    maintenance = await get_maintenance(db=db, maintenance_id=maintenance_id)
     if not maintenance:
         raise HTTPException(status_code=404, detail="Maintenance not found")
     return maintenance
@@ -41,12 +39,10 @@ async def read_all_maintenance(
     page: int = Query(1, ge=1, description="Página actual"),
     page_size: int = Query(20, ge=1, le=100, description="Número de elementos por página"),
     search: str = Query(None, description="Término de búsqueda para filtrar mantenimientos"),
-    db: AsyncSession = Depends(get_db),
-    organization = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
     return await get_all_maintenance(
-        db=db, 
-        organization_id=organization.id,
+        db=db,
         page=page, 
         page_size=page_size, 
         search=search
@@ -55,24 +51,21 @@ async def read_all_maintenance(
 @router.get("/asset/{asset_id}", response_model=List[MaintenanceRead])
 async def read_maintenance_by_asset(
     asset_id: int,
-    db: AsyncSession = Depends(get_db),
-    organization = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
-    return await get_maintenance_by_asset(db=db, asset_id=asset_id, organization_id=organization.id)
+    return await get_maintenance_by_asset(db=db, asset_id=asset_id)
 
 @router.put("/{maintenance_id}", response_model=MaintenanceRead)
 async def update_existing_maintenance(
     maintenance_id: int,
     maintenance_in: MaintenanceUpdate,
     db: AsyncSession = Depends(get_db),
-    user = Depends(require_role(["Admin", "Supervisor", "Tecnico"])),
-    organization = Depends(get_current_organization)
+    user = Depends(require_role(["Admin", "Supervisor", "Tecnico"]))
 ):
     maintenance = await update_maintenance(
-        db=db, 
-        maintenance_id=maintenance_id, 
+        db=db,
+        maintenance_id=maintenance_id,
         maintenance_in=maintenance_in,
-        organization_id=organization.id
     )
     if not maintenance:
         raise HTTPException(status_code=404, detail="Maintenance not found")
@@ -82,10 +75,9 @@ async def update_existing_maintenance(
 async def delete_existing_maintenance(
     maintenance_id: int,
     db: AsyncSession = Depends(get_db),
-    user = Depends(require_role(["Admin", "Supervisor"])),
-    organization = Depends(get_current_organization)
+    user = Depends(require_role(["Admin", "Supervisor"]))
 ):
-    result = await delete_maintenance(db=db, maintenance_id=maintenance_id, organization_id=organization.id)
+    result = await delete_maintenance(db=db, maintenance_id=maintenance_id)
     if not result:
         raise HTTPException(status_code=404, detail="Maintenance not found")
     return {"detail": "Maintenance deleted successfully"}

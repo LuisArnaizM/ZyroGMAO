@@ -3,27 +3,22 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.models.component import Component
 from app.models.asset import Asset
-from app.models.organization import Organization
 from app.schemas.component import ComponentCreate, ComponentUpdate
 from typing import List, Optional
 
-async def create_component(db: AsyncSession, component_in: ComponentCreate, organization_id: int):
+async def create_component(db: AsyncSession, component_in: ComponentCreate):
     """Crear un nuevo componente"""
     
     # Verificar que el asset existe y pertenece a la organización
-    stmt = select(Asset).where(
-        Asset.id == component_in.asset_id,
-        Asset.organization_id == organization_id
-    )
+    stmt = select(Asset).where(Asset.id == component_in.asset_id)
     result = await db.execute(stmt)
     asset = result.scalar_one_or_none()
     
     if not asset:
-        raise ValueError(f"Asset with ID {component_in.asset_id} does not exist in this organization")
+        raise ValueError(f"Asset with ID {component_in.asset_id} does not exist")
     
     # Crear el componente
     component_data = component_in.model_dump()
-    component_data["organization_id"] = organization_id
     
     db_component = Component(**component_data)
     db.add(db_component)
@@ -32,11 +27,11 @@ async def create_component(db: AsyncSession, component_in: ComponentCreate, orga
     
     return db_component
 
-async def get_components(db: AsyncSession, organization_id: int, asset_id: Optional[int] = None, 
+async def get_components(db: AsyncSession, asset_id: Optional[int] = None, 
                        skip: int = 0, limit: int = 100) -> List[Component]:
     """Obtener componentes con filtros opcionales"""
     
-    stmt = select(Component).where(Component.organization_id == organization_id)
+    stmt = select(Component)
     
     if asset_id:
         stmt = stmt.where(Component.asset_id == asset_id)
@@ -49,12 +44,11 @@ async def get_components(db: AsyncSession, organization_id: int, asset_id: Optio
     result = await db.execute(stmt)
     return result.scalars().all()
 
-async def get_component(db: AsyncSession, component_id: int, organization_id: int):
+async def get_component(db: AsyncSession, component_id: int):
     """Obtener un componente específico"""
     
     stmt = select(Component).where(
-        Component.id == component_id,
-        Component.organization_id == organization_id
+        Component.id == component_id
     ).options(
         selectinload(Component.asset),
         selectinload(Component.responsible),
@@ -72,13 +66,10 @@ async def get_component(db: AsyncSession, component_id: int, organization_id: in
     
     return component
 
-async def update_component(db: AsyncSession, component_id: int, component_in: ComponentUpdate, organization_id: int):
+async def update_component(db: AsyncSession, component_id: int, component_in: ComponentUpdate):
     """Actualizar un componente"""
     
-    stmt = select(Component).where(
-        Component.id == component_id,
-        Component.organization_id == organization_id
-    )
+    stmt = select(Component).where(Component.id == component_id)
     result = await db.execute(stmt)
     db_component = result.scalar_one_or_none()
     
@@ -95,13 +86,10 @@ async def update_component(db: AsyncSession, component_id: int, component_in: Co
     
     return db_component
 
-async def delete_component(db: AsyncSession, component_id: int, organization_id: int):
+async def delete_component(db: AsyncSession, component_id: int):
     """Eliminar un componente"""
     
-    stmt = select(Component).where(
-        Component.id == component_id,
-        Component.organization_id == organization_id
-    )
+    stmt = select(Component).where(Component.id == component_id)
     result = await db.execute(stmt)
     db_component = result.scalar_one_or_none()
     
@@ -113,26 +101,23 @@ async def delete_component(db: AsyncSession, component_id: int, organization_id:
     
     return {"message": "Component deleted successfully"}
 
-async def get_components_by_asset(db: AsyncSession, asset_id: int, organization_id: int) -> List[Component]:
+async def get_components_by_asset(db: AsyncSession, asset_id: int) -> List[Component]:
     """Obtener todos los componentes de un asset específico"""
     
     # Verificar que el asset existe y pertenece a la organización
-    stmt = select(Asset).where(
-        Asset.id == asset_id,
-        Asset.organization_id == organization_id
-    )
+    stmt = select(Asset).where(Asset.id == asset_id)
     result = await db.execute(stmt)
     asset = result.scalar_one_or_none()
     
     if not asset:
-        raise ValueError(f"Asset with ID {asset_id} does not exist in this organization")
+        raise ValueError(f"Asset with ID {asset_id} does not exist")
     
-    return await get_components(db, organization_id, asset_id=asset_id)
+    return await get_components(db, asset_id=asset_id)
 
-async def get_component_statistics(db: AsyncSession, component_id: int, organization_id: int):
+async def get_component_statistics(db: AsyncSession, component_id: int):
     """Obtener estadísticas de un componente"""
     
-    component = await get_component(db, component_id, organization_id)
+    component = await get_component(db, component_id)
     
     stats = {
         "component_id": component_id,

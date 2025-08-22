@@ -5,28 +5,20 @@ from app.models.asset import Asset
 from app.models.failure import Failure
 from app.schemas.workorder import WorkOrderCreate, WorkOrderRead, WorkOrderUpdate
 from datetime import datetime, timezone
+from app.models.user import User
+from app.models.department import Department
 
-async def create_workorder(db: AsyncSession, workorder_in: WorkOrderCreate, created_by: int, organization_id: int):
+async def create_workorder(db: AsyncSession, workorder_in: WorkOrderCreate, created_by: int):
     """Create a new work order"""
     
     # Verificar que el asset existe en la organización
-    asset = await db.execute(
-        select(Asset).where(
-            Asset.id == workorder_in.asset_id,
-            Asset.organization_id == organization_id
-        )
-    )
+    asset = await db.execute(select(Asset).where(Asset.id == workorder_in.asset_id))
     if not asset.scalar_one_or_none():
         raise ValueError(f"Asset with ID {workorder_in.asset_id} does not exist in this organization")
     
     # Verificar failure si se proporciona
     if workorder_in.failure_id:
-        failure = await db.execute(
-            select(Failure).where(
-                Failure.id == workorder_in.failure_id,
-                Failure.organization_id == organization_id
-            )
-        )
+        failure = await db.execute(select(Failure).where(Failure.id == workorder_in.failure_id))
         if not failure.scalar_one_or_none():
             raise ValueError(f"Failure with ID {workorder_in.failure_id} does not exist in this organization")
     
@@ -43,7 +35,7 @@ async def create_workorder(db: AsyncSession, workorder_in: WorkOrderCreate, crea
     if workorder_data.get('scheduled_date'):
         workorder_data['scheduled_date'] = to_naive_utc(workorder_data['scheduled_date'])
     workorder_data['created_by'] = created_by
-    workorder_data['organization_id'] = organization_id
+    # organization removed
     
     new_workorder = WorkOrder(**workorder_data)
     db.add(new_workorder)
@@ -51,19 +43,15 @@ async def create_workorder(db: AsyncSession, workorder_in: WorkOrderCreate, crea
     await db.refresh(new_workorder)
     return new_workorder
 
-async def get_workorder(db: AsyncSession, workorder_id: int, organization_id: int):
+async def get_workorder(db: AsyncSession, workorder_id: int):
     """Get a work order by ID within organization"""
     result = await db.execute(
-        select(WorkOrder).where(
-            WorkOrder.id == workorder_id,
-            WorkOrder.organization_id == organization_id
-        )
+    select(WorkOrder).where(WorkOrder.id == workorder_id)
     )
     return result.scalar_one_or_none()
 
 async def get_workorders(
     db: AsyncSession,
-    organization_id: int,
     page: int = 1,
     page_size: int = 20,
     search: str = None,
@@ -72,10 +60,10 @@ async def get_workorders(
     priority: str = None,
     assigned_to: int = None
 ):
-    """Get all work orders with filters, pagination and search capability within organization"""
+    """Get all work orders with filters, pagination and search capability"""
     offset = (page - 1) * page_size
     
-    query = select(WorkOrder).where(WorkOrder.organization_id == organization_id)
+    query = select(WorkOrder)
     
     if search:
         search_term = f"%{search}%"
@@ -100,33 +88,24 @@ async def get_workorders(
     result = await db.execute(query)
     return result.scalars().all()
 
-async def get_workorders_by_asset(db: AsyncSession, asset_id: int, organization_id: int):
-    """Get all work orders for a specific asset within organization"""
+async def get_workorders_by_asset(db: AsyncSession, asset_id: int):
+    """Get all work orders for a specific asset"""
     result = await db.execute(
-        select(WorkOrder).where(
-            WorkOrder.asset_id == asset_id,
-            WorkOrder.organization_id == organization_id
-        ).order_by(WorkOrder.created_at.desc())
+        select(WorkOrder).where(WorkOrder.asset_id == asset_id).order_by(WorkOrder.created_at.desc())
     )
     return result.scalars().all()
 
-async def get_workorders_by_user(db: AsyncSession, user_id: int, organization_id: int):
-    """Get all work orders assigned to a specific user within organization"""
+async def get_workorders_by_user(db: AsyncSession, user_id: int):
+    """Get all work orders assigned to a specific user"""
     result = await db.execute(
-        select(WorkOrder).where(
-            WorkOrder.assigned_to == user_id,
-            WorkOrder.organization_id == organization_id
-        ).order_by(WorkOrder.scheduled_date.asc())
+        select(WorkOrder).where(WorkOrder.assigned_to == user_id).order_by(WorkOrder.scheduled_date.asc())
     )
     return result.scalars().all()
 
-async def update_workorder(db: AsyncSession, workorder_id: int, workorder_in: WorkOrderUpdate, organization_id: int):
-    """Update a work order by ID within organization"""
+async def update_workorder(db: AsyncSession, workorder_id: int, workorder_in: WorkOrderUpdate):
+    """Update a work order by ID"""
     result = await db.execute(
-        select(WorkOrder).where(
-            WorkOrder.id == workorder_id,
-            WorkOrder.organization_id == organization_id
-        )
+        select(WorkOrder).where(WorkOrder.id == workorder_id)
     )
     workorder = result.scalar_one_or_none()
     
@@ -144,9 +123,9 @@ async def update_workorder(db: AsyncSession, workorder_id: int, workorder_in: Wo
     
     # Lógica para fechas automáticas
     if update_data.get('status') == 'in_progress' and not workorder.started_date:
-        update_data['started_date'] = datetime.utcnow()
+        update_data['started_date'] = datetime.now(timezone.utc)
     elif update_data.get('status') == 'completed' and not workorder.completed_date:
-        update_data['completed_date'] = datetime.utcnow()
+        update_data['completed_date'] = datetime.now(timezone.utc)
 
     # Normalize possible provided datetime fields
     if 'scheduled_date' in update_data:
@@ -156,22 +135,42 @@ async def update_workorder(db: AsyncSession, workorder_id: int, workorder_in: Wo
     if 'completed_date' in update_data and isinstance(update_data['completed_date'], datetime):
         update_data['completed_date'] = to_naive_utc(update_data['completed_date'])
     
+    # Validación de asignación por departamento: si se establece assigned_to, comprobar que el usuario pertenece al mismo departamento (o subárbol) de workorder.department_id si existe
+    if 'assigned_to' in update_data and update_data['assigned_to'] is not None:
+        # Determinar el department objetivo
+        target_dep_id = update_data.get('department_id', workorder.department_id)
+        if target_dep_id is not None:
+            # construir subárbol
+            deps_result = await db.execute(select(Department))
+            deps = deps_result.scalars().all()
+            by_parent = {}
+            for d in deps:
+                by_parent.setdefault(d.parent_id, []).append(d.id)
+            to_visit = [target_dep_id]
+            subtree = set()
+            while to_visit:
+                cur = to_visit.pop()
+                subtree.add(cur)
+                to_visit.extend(by_parent.get(cur, []))
+            # obtener usuario asignado
+            user_q = await db.execute(select(User).where(User.id == update_data['assigned_to']))
+            assigned_user = user_q.scalar_one_or_none()
+            if not assigned_user or assigned_user.department_id not in subtree:
+                raise ValueError("Assigned user does not belong to target department subtree")
+
     for key, value in update_data.items():
         setattr(workorder, key, value)
     
-    workorder.updated_at = datetime.utcnow()
+    workorder.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     await db.refresh(workorder)
     return workorder
 
-async def delete_workorder(db: AsyncSession, workorder_id: int, organization_id: int):
-    """Delete a work order by ID within organization"""
+async def delete_workorder(db: AsyncSession, workorder_id: int):
+    """Delete a work order by ID"""
     result = await db.execute(
-        select(WorkOrder).where(
-            WorkOrder.id == workorder_id,
-            WorkOrder.organization_id == organization_id
-        )
+        select(WorkOrder).where(WorkOrder.id == workorder_id)
     )
     workorder = result.scalar_one_or_none()
     

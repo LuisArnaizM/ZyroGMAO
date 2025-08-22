@@ -4,70 +4,73 @@ from app.models.failure import Failure
 from app.models.asset import Asset
 from app.models.component import Component
 from app.schemas.failure import FailureCreate, FailureRead, FailureUpdate
-from datetime import datetime
+from datetime import datetime, timezone
+import enum as _py_enum
+from app.models.enums import FailureStatus, FailureSeverity
 
-async def create_failure(db: AsyncSession, failure_in: FailureCreate, reported_by: int, organization_id: int):
+async def create_failure(db: AsyncSession, failure_in: FailureCreate, reported_by: int):
     """Create a new failure report"""
     
     # Validar que al menos uno de los IDs esté presente
     if not failure_in.asset_id and not failure_in.component_id:
         raise ValueError("Debe proporcionar asset_id o component_id")
 
-    # Verificar que el asset o component existe en la organización
+    # Verificar que el asset o component existe
     if failure_in.asset_id:
         asset = await db.execute(
             select(Asset).where(
-                Asset.id == failure_in.asset_id,
-                Asset.organization_id == organization_id
+                Asset.id == failure_in.asset_id
             )
         )
         if not asset.scalar_one_or_none():
-            raise ValueError(f"Asset with ID {failure_in.asset_id} does not exist in this organization")
+            raise ValueError(f"Asset with ID {failure_in.asset_id} does not exist")
 
     if failure_in.component_id:
         component = await db.execute(
             select(Component).where(
-                Component.id == failure_in.component_id,
-                Component.organization_id == organization_id
+                Component.id == failure_in.component_id
             )
         )
         if not component.scalar_one_or_none():
-            raise ValueError(f"Component with ID {failure_in.component_id} does not exist in this organization")
+            raise ValueError(f"Component with ID {failure_in.component_id} does not exist")
     
     failure_data = failure_in.model_dump(exclude_none=True)
     failure_data['reported_by'] = reported_by
-    failure_data['organization_id'] = organization_id
-    failure_data['status'] = 'reported'
-    
+    # Ensure status and severity are stored as the enum value strings expected by the DB
+    failure_data['status'] = FailureStatus.REPORTED.value
+
+    sev = failure_data.get('severity')
+    if sev is not None:
+        if isinstance(sev, _py_enum.Enum):
+            failure_data['severity'] = sev.value
+        else:
+            failure_data['severity'] = str(sev).upper()
+
     new_failure = Failure(**failure_data)
     db.add(new_failure)
     await db.commit()
     await db.refresh(new_failure)
     return new_failure
 
-async def get_failure(db: AsyncSession, failure_id: int, organization_id: int):
+async def get_failure(db: AsyncSession, failure_id: int):
     """Get a failure by ID within organization"""
     result = await db.execute(
-        select(Failure).where(
-            Failure.id == failure_id,
-            Failure.organization_id == organization_id
-        )
+    select(Failure).where(Failure.id == failure_id)
     )
     return result.scalar_one_or_none()
 
 async def get_failures(
     db: AsyncSession,
-    organization_id: int,
     page: int = 1,
     page_size: int = 20,
     search: str = None,
     status: str = None,
     severity: str = None
 ):
-    """Get all failures with filters, pagination and search capability within organization"""
+    """Get all failures with filters, pagination and search capability"""
     offset = (page - 1) * page_size
     
-    query = select(Failure).where(Failure.organization_id == organization_id)
+    query = select(Failure)
     
     if search:
         search_term = f"%{search}%"
@@ -77,32 +80,35 @@ async def get_failures(
         )
     
     if status:
-        query = query.where(Failure.status == status)
-    
+        # normalize incoming filter to enum value
+        if isinstance(status, _py_enum.Enum):
+            status_val = status.value
+        else:
+            status_val = str(status).upper()
+        query = query.where(Failure.status == status_val)
+
     if severity:
-        query = query.where(Failure.severity == severity)
+        if isinstance(severity, _py_enum.Enum):
+            severity_val = severity.value
+        else:
+            severity_val = str(severity).upper()
+        query = query.where(Failure.severity == severity_val)
     
     query = query.offset(offset).limit(page_size).order_by(Failure.reported_date.desc())
     result = await db.execute(query)
     return result.scalars().all()
 
-async def get_failures_by_asset(db: AsyncSession, asset_id: int, organization_id: int):
-    """Get all failures for a specific asset within organization"""
+async def get_failures_by_asset(db: AsyncSession, asset_id: int):
+    """Get all failures for a specific asset"""
     result = await db.execute(
-        select(Failure).where(
-            Failure.asset_id == asset_id,
-            Failure.organization_id == organization_id
-        ).order_by(Failure.reported_date.desc())
+        select(Failure).where(Failure.asset_id == asset_id).order_by(Failure.reported_date.desc())
     )
     return result.scalars().all()
 
-async def update_failure(db: AsyncSession, failure_id: int, failure_in: FailureUpdate, organization_id: int):
-    """Update a failure by ID within organization"""
+async def update_failure(db: AsyncSession, failure_id: int, failure_in: FailureUpdate):
+    """Update a failure by ID"""
     result = await db.execute(
-        select(Failure).where(
-            Failure.id == failure_id,
-            Failure.organization_id == organization_id
-        )
+        select(Failure).where(Failure.id == failure_id)
     )
     failure = result.scalar_one_or_none()
     
@@ -112,25 +118,37 @@ async def update_failure(db: AsyncSession, failure_id: int, failure_in: FailureU
     update_data = failure_in.model_dump(exclude_unset=True)
     
     # Si se marca como resuelto y no tenía fecha de resolución, agregarla
-    if update_data.get('status') == 'resolved' and not failure.resolved_date:
-        update_data['resolved_date'] = datetime.utcnow()
-    
+    status_in = update_data.get('status')
+    if status_in is not None:
+        if isinstance(status_in, _py_enum.Enum):
+            status_norm = status_in.value
+        else:
+            status_norm = str(status_in).upper()
+        update_data['status'] = status_norm
+        if status_norm == FailureStatus.RESOLVED.value and not failure.resolved_date:
+            update_data['resolved_date'] = datetime.now(timezone.utc)
+
+    # Normalize severity if present
+    sev_in = update_data.get('severity')
+    if sev_in is not None:
+        if isinstance(sev_in, _py_enum.Enum):
+            update_data['severity'] = sev_in.value
+        else:
+            update_data['severity'] = str(sev_in).upper()
+
     for key, value in update_data.items():
         setattr(failure, key, value)
     
-    failure.updated_at = datetime.utcnow()
+    failure.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     await db.refresh(failure)
     return failure
 
-async def delete_failure(db: AsyncSession, failure_id: int, organization_id: int):
-    """Delete a failure by ID within organization"""
+async def delete_failure(db: AsyncSession, failure_id: int):
+    """Delete a failure by ID"""
     result = await db.execute(
-        select(Failure).where(
-            Failure.id == failure_id,
-            Failure.organization_id == organization_id
-        )
+        select(Failure).where(Failure.id == failure_id)
     )
     failure = result.scalar_one_or_none()
     

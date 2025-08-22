@@ -2,6 +2,8 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Floa
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database.postgres import Base
+from sqlalchemy import String
+from app.models.enums import ComponentStatus
 
 class Component(Base):
     __tablename__ = "components"
@@ -12,9 +14,10 @@ class Component(Base):
     component_type = Column(String(50), nullable=False)  # motor, bomba, válvula, etc.
     model = Column(String(100))
     serial_number = Column(String(100), unique=True, index=True)
-    location = Column(String(200))  # Ubicación específica dentro del asset
-    status = Column(String(50), default="operational")  # operational, maintenance, failed, etc.
-    
+    location = Column(String(200))
+    # Persist status as plain string to avoid strict Enum mapping errors with legacy DB values
+    status = Column(String(50), default=ComponentStatus.ACTIVE.value, nullable=False)
+
     # Fechas
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -32,14 +35,9 @@ class Component(Base):
     
     # Responsable del componente
     responsible_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    
-    # Organización (heredada del asset, pero duplicada para facilitar consultas)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
-    
     # Relaciones
     asset = relationship("Asset", back_populates="components")
     responsible = relationship("User", back_populates="responsible_components")
-    organization = relationship("Organization", back_populates="components")
     
     # Relaciones con otros modelos que antes dependían de Machine
     sensors = relationship("Sensor", back_populates="component", cascade="all, delete-orphan")
@@ -47,6 +45,10 @@ class Component(Base):
     failures = relationship("Failure", back_populates="component")
     maintenance_records = relationship("Maintenance", back_populates="component")
     tasks = relationship("Task", back_populates="component")
+    # Inventario y usos en tareas
+    inventory_item = relationship("InventoryItem", uselist=False, back_populates="component")
+    used_in_tasks = relationship("TaskUsedComponent", back_populates="component")
+    maintenance_plans = relationship("MaintenancePlan", back_populates="component", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Component(id={self.id}, name='{self.name}', type='{self.component_type}')>"

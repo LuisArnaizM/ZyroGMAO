@@ -12,7 +12,7 @@ from app.controllers.sensor import (
     update_sensor_config,
     delete_sensor_config
 )
-from app.auth.dependencies import get_current_user, require_role, get_current_organization
+from app.auth.dependencies import get_current_user, require_role
 
 router = APIRouter(tags=["Sensors"])
 
@@ -20,22 +20,16 @@ router = APIRouter(tags=["Sensors"])
 async def create_new_sensor_config(
     sensor_in: SensorConfigCreate,
     db: AsyncSession = Depends(get_db),
-    user = Depends(require_role(["Admin", "Supervisor"])),
-    organization = Depends(get_current_organization)
+    user = Depends(require_role(["Admin", "Supervisor"]))
 ):
-    return await create_sensor_config(
-        db=db,
-        sensor_in=sensor_in,
-        organization_id=organization.id
-    )
+    return await create_sensor_config(db=db, sensor_in=sensor_in)
 
 @router.get("/{sensor_id}", response_model=SensorConfigRead)
 async def read_sensor_config(
     sensor_id: int,
-    db: AsyncSession = Depends(get_db),
-    organization = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
-    sensor = await get_sensor_config(db=db, sensor_id=sensor_id, organization_id=organization.id)
+    sensor = await get_sensor_config(db=db, sensor_id=sensor_id)
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor configuration not found")
     return sensor
@@ -47,12 +41,10 @@ async def read_sensor_configs(
     search: str = Query(None, description="Término de búsqueda para filtrar sensores"),
     sensor_type: str = Query(None, description="Filtrar por tipo de sensor"),
     is_active: bool = Query(None, description="Filtrar por estado activo"),
-    db: AsyncSession = Depends(get_db),
-    organization = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
     return await get_sensor_configs(
         db=db,
-        organization_id=organization.id,
         page=page,
         page_size=page_size,
         search=search,
@@ -63,24 +55,21 @@ async def read_sensor_configs(
 @router.get("/asset/{asset_id}", response_model=List[SensorConfigRead])
 async def read_sensors_by_asset(
     asset_id: int,
-    db: AsyncSession = Depends(get_db),
-    organization = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
-    return await get_sensors_by_asset(db=db, asset_id=asset_id, organization_id=organization.id)
+    return await get_sensors_by_asset(db=db, asset_id=asset_id)
 
 @router.put("/{sensor_id}", response_model=SensorConfigRead)
 async def update_existing_sensor_config(
     sensor_id: int,
     sensor_in: SensorConfigUpdate,
     db: AsyncSession = Depends(get_db),
-    user = Depends(require_role(["Admin", "Supervisor"])),
-    organization = Depends(get_current_organization)
+    user = Depends(require_role(["Admin", "Supervisor"]))
 ):
     sensor = await update_sensor_config(
         db=db,
         sensor_id=sensor_id,
         sensor_in=sensor_in,
-        organization_id=organization.id
     )
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor configuration not found")
@@ -90,10 +79,9 @@ async def update_existing_sensor_config(
 async def delete_existing_sensor_config(
     sensor_id: int,
     db: AsyncSession = Depends(get_db),
-    user = Depends(require_role(["Admin", "Supervisor"])),
-    organization = Depends(get_current_organization)
+    user = Depends(require_role(["Admin", "Supervisor"]))
 ):
-    result = await delete_sensor_config(db=db, sensor_id=sensor_id, organization_id=organization.id)
+    result = await delete_sensor_config(db=db, sensor_id=sensor_id)
     if not result:
         raise HTTPException(status_code=404, detail="Sensor configuration not found")
     return {"detail": "Sensor configuration deleted successfully"}

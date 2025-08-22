@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional, Union  # Eliminado 'Float' de aquí
 
 # Esquema para la configuración de sensores en PostgreSQL
@@ -40,7 +40,7 @@ class SensorReadingCreate(BaseModel):
     sensor_id: int  # Referencia al ID del sensor en PostgreSQL
     asset_id: int   # Referencia al ID del asset
     value: Union[float, int, str]  # Puede ser cualquiera de estos tipos
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SensorReadingRead(SensorReadingCreate):
     id: str  # MongoDB ObjectId como string

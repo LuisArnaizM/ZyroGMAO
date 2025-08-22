@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database.postgres import Base
@@ -12,6 +12,8 @@ class Task(Base):
     status = Column(String(50), default="pending")  # pending, in_progress, completed, cancelled
     priority = Column(String(20), default="medium")  # low, medium, high
     due_date = Column(DateTime, nullable=True)
+    estimated_hours = Column(Float, nullable=True)
+    completion_notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -20,7 +22,8 @@ class Task(Base):
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=True)
     component_id = Column(Integer, ForeignKey("components.id"), nullable=True)  # Reemplaza machine_id
     workorder_id = Column(Integer, ForeignKey("workorders.id"), nullable=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    # organización eliminada
+    # organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Quien creó la tarea
     
     # Relationships
@@ -29,4 +32,5 @@ class Task(Base):
     asset = relationship("Asset", back_populates="tasks")
     component = relationship("Component", back_populates="tasks")  # Reemplaza machine
     workorder = relationship("WorkOrder", back_populates="tasks")
-    organization = relationship("Organization", back_populates="tasks")
+    # organization = relationship("Organization", back_populates="tasks")
+    used_components = relationship("TaskUsedComponent", back_populates="task", cascade="all, delete-orphan")

@@ -22,15 +22,13 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    # Foreign Key para organización
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    # Organización eliminada
+    # organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     
     # Relationships
-    organization = relationship("Organization", back_populates="users")
+    # organization = relationship("Organization", back_populates="users")
     department = relationship("Department", back_populates="users", foreign_keys=[department_id])
-    # Departments where the user is manager
-    managed_departments = relationship("Department", back_populates="manager", foreign_keys="Department.manager_id")
     assigned_tasks = relationship("Task", foreign_keys="Task.assigned_to", back_populates="assignee")
     created_tasks = relationship("Task", foreign_keys="Task.created_by_id", back_populates="creator")
     responsible_assets = relationship("Asset", foreign_keys="Asset.responsible_id", back_populates="responsible")

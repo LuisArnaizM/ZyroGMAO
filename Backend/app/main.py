@@ -5,11 +5,11 @@ from contextlib import asynccontextmanager
 import logging
 
 from app.config import settings
-from app.database.postgres import check_connection, create_tables
+from app.database.postgres import check_connection, create_tables, apply_simple_migrations
 from app.database.data_seed import seed_database
 from app.routers import (
-    auth, users, organization, assets, sensors, 
-    failures, maintenance, tasks, workorders, components, department
+    auth, users, assets, sensors,
+    failures, maintenance, maintenance_plan, tasks, workorders, components, department, kpi, inventory
 )
 
 # Configurar logging
@@ -36,11 +36,15 @@ async def lifespan(app: FastAPI):
             logger.info("📝 Verificando/creando tablas...")
             await create_tables()
             logger.info("✅ Tablas verificadas/creadas exitosamente")
+            # Aplicar migraciones simples
+            logger.info("🧩 Aplicando migraciones simples...")
+            await apply_simple_migrations()
+            logger.info("✅ Migraciones simples aplicadas")
             
-            # Poblar con datos iniciales si es necesario
-            logger.info("🌱 Verificando datos iniciales...")
+            # Poblar con datos iniciales (org-free ya dentro de data_seed)
+            logger.info("🌱 Verificando/poblando datos iniciales...")
             await seed_database()
-            logger.info("✅ Datos iniciales verificados")
+            logger.info("✅ Datos iniciales listos")
             
         except Exception as e:
             logger.warning(f"⚠️ Error durante la inicialización de datos: {e}")
@@ -74,34 +78,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Middleware de hosts confiables (deshabilitado en desarrollo)
-# TODO: Habilitar en producción con configuración correcta
-# if not settings.DEBUG and settings.BACKEND_CORS_ORIGINS:
-#     allowed_hosts = []
-#     for origin in settings.BACKEND_CORS_ORIGINS:
-#         if "://" in origin:
-#             host = origin.split("://")[1]
-#             allowed_hosts.append(host)
-#         else:
-#             allowed_hosts.append(origin)
-#     
-#     app.add_middleware(
-#         TrustedHostMiddleware,
-#         allowed_hosts=allowed_hosts
-#     )
-
 # Incluir routers
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth")
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users")
-app.include_router(organization.router, prefix=f"{settings.API_V1_STR}/organization")
 app.include_router(assets.router, prefix=f"{settings.API_V1_STR}/assets")
 app.include_router(components.router, prefix=f"{settings.API_V1_STR}/components")
 app.include_router(department.router, prefix=f"{settings.API_V1_STR}/department")
 app.include_router(sensors.router, prefix=f"{settings.API_V1_STR}/sensors")
 app.include_router(failures.router, prefix=f"{settings.API_V1_STR}/failures")
 app.include_router(maintenance.router, prefix=f"{settings.API_V1_STR}/maintenance")
+app.include_router(maintenance_plan.router, prefix=f"{settings.API_V1_STR}/maintenance/plans")
 app.include_router(tasks.router, prefix=f"{settings.API_V1_STR}/tasks")
 app.include_router(workorders.router, prefix=f"{settings.API_V1_STR}/workorders")
+app.include_router(kpi.router, prefix=f"{settings.API_V1_STR}/kpi")
+app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory")
 
 @app.get("/")
 async def root():

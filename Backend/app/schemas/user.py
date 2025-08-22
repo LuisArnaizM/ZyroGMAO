@@ -9,7 +9,6 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: str
-    organization_id: Optional[int] = None  # Para super admin que crea usuarios
     department_id: Optional[int] = None
 
 class UserRead(BaseModel):
@@ -20,7 +19,6 @@ class UserRead(BaseModel):
     email: str
     role: str
     is_active: int
-    organization_id: Optional[int] = None
     department_id: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -29,10 +27,8 @@ class UserRead(BaseModel):
         from_attributes = True
 
 class UserReadWithOrganization(UserRead):
-    organization: Optional["OrganizationRead"] = None
-    
-    class Config:
-        from_attributes = True
+    """Conservado por compatibilidad; ya no incluye organization."""
+    pass
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
@@ -41,13 +37,12 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     role: Optional[str] = None
     is_active: Optional[int] = None
-    organization_id: Optional[int] = None  # Solo para super admin
     department_id: Optional[int] = None
 
 class UserLogin(BaseModel):
     login: str
     password: str
-    organization_slug: Optional[str] = None  # Para login multi-org
+    # Campo legacy eliminado: organization_slug
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
@@ -55,7 +50,6 @@ class ChangePasswordRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
-    organization_slug: Optional[str] = None
 
 class ResetPasswordRequest(BaseModel):
     token: str
@@ -72,12 +66,10 @@ class UserProfile(BaseModel):
     email: str
     role: str
     is_active: int
-    organization_id: Optional[int] = None
     department_id: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     full_name: str
-    organization: Optional["OrganizationRead"] = None
     
     class Config:
         from_attributes = True
@@ -92,12 +84,10 @@ class UserProfile(BaseModel):
             email=user.email,
             role=user.role,
             is_active=user.is_active,
-            organization_id=user.organization_id,
             department_id=getattr(user, 'department_id', None),
             created_at=user.created_at,
             updated_at=user.updated_at,
             full_name=f"{user.first_name} {user.last_name}",
-            organization=user.organization
         )
 
 class UserReference(BaseModel):
@@ -120,7 +110,4 @@ class UserReference(BaseModel):
             full_name=f"{user.first_name} {user.last_name}"
         )
 
-# Importar después para evitar dependencias circulares
-from app.schemas.organization import OrganizationRead
-UserReadWithOrganization.model_rebuild()
-UserProfile.model_rebuild()
+# Limpieza de referencias a organization; clases listas sin dependencias adicionales

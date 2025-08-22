@@ -13,10 +13,12 @@ from app.controllers.department import (
     list_users_in_department_subtree,
 )
 from app.schemas.user import UserRead
-from app.auth.dependencies import require_role, get_current_organization
+from app.auth.dependencies import require_role
+from app.models.user import User
+from sqlalchemy.future import select
 
 
-router = APIRouter(prefix="/departments", tags=["Departments"])
+router = APIRouter(tags=["Departments"])
 
 
 @router.post("/", response_model=DepartmentRead)
@@ -31,10 +33,9 @@ async def create_dep(
 
 @router.get("/", response_model=List[DepartmentRead])
 async def list_deps(
-    db: AsyncSession = Depends(get_db),
-    org = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
-    return await list_departments(db, organization_id=org.id)
+    return await list_departments(db)
 
 
 @router.get("/{dep_id}", response_model=DepartmentRead)
@@ -81,3 +82,12 @@ async def users_in_subtree(
     user = Depends(require_role(["Admin", "Supervisor"]))
 ):
     return await list_users_in_department_subtree(db, dep_id)
+
+@router.get("/{dep_id}/technicians", response_model=List[UserRead])
+async def technicians_in_subtree(
+    dep_id: int,
+    db: AsyncSession = Depends(get_db),
+    user = Depends(require_role(["Admin", "Supervisor"]))
+):
+    users = await list_users_in_department_subtree(db, dep_id)
+    return [u for u in users if u.role in ("Tecnico", "Supervisor")]

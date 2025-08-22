@@ -28,7 +28,7 @@ async def create_user(db: AsyncSession, user_in: UserCreate):
         email=user_in.email,
         hashed_password=pwd_context.hash(user_in.password),
         role=user_in.role,
-    department_id=user_in.department_id,
+        department_id=user_in.department_id,
         is_active=1  # Activo por defecto
     )
     db.add(new_user)
@@ -37,12 +37,8 @@ async def create_user(db: AsyncSession, user_in: UserCreate):
     return new_user
 
 async def get_user(db: AsyncSession, user_id: int):
-    """Get a user by ID with organization loaded"""
-    result = await db.execute(
-        select(User)
-        .options(selectinload(User.organization))  # ← AGREGAR ESTA LÍNEA
-        .where(User.id == user_id)
-    )
+    """Get a user by ID"""
+    result = await db.execute(select(User).where(User.id == user_id))
     return result.scalar_one_or_none()
 async def get_user_by_email(db: AsyncSession, email: str):
     """Get a user by email"""
@@ -67,7 +63,9 @@ async def get_users(
     db: AsyncSession,
     page: int = 1,
     page_size: int = 20,
-    search: str = None
+    search: str = None,
+    role: str | None = None,
+    is_active: bool | None = None,
 ):
     """
     Get all users with pagination and search capability
@@ -94,6 +92,12 @@ async def get_users(
             (User.last_name.ilike(search_term)) |
             (User.role.ilike(search_term))
         )
+    # Apply role filter if provided
+    if role:
+        query = query.where(User.role == role)
+    # Apply is_active filter if provided (0/1)
+    if is_active is not None:
+        query = query.where(User.is_active.is_(bool(is_active)))
     
     # Apply pagination
     query = query.offset(offset).limit(page_size)

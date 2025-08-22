@@ -8,7 +8,6 @@ class DepartmentBase(BaseModel):
     description: Optional[str] = None
     parent_id: Optional[int] = None
     manager_id: Optional[int] = None
-    organization_id: int
     is_active: Optional[bool] = True
 
 
@@ -30,7 +29,6 @@ class DepartmentRead(BaseModel):
     description: Optional[str] = None
     parent_id: Optional[int] = None
     manager_id: Optional[int] = None
-    organization_id: int
     is_active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None

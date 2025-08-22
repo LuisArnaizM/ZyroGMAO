@@ -10,7 +10,7 @@ class Sensor(Base):
     name = Column(String(100), nullable=False)
     sensor_type = Column(String(50), nullable=False)  # temperature, pressure, vibration, etc.
     description = Column(Text)
-    unit = Column(String(20))  # °C, bar, mm/s, etc.
+    unit = Column(String(20))  
     min_value = Column(Float)
     max_value = Column(Float)
     warning_threshold = Column(Float)
@@ -25,10 +25,11 @@ class Sensor(Base):
     # Foreign Keys - Sensor puede estar en un Asset o en un Component específico
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=True)
     component_id = Column(Integer, ForeignKey("components.id"), nullable=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    # organización eliminada
+    # organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     
     # Relationships
     asset = relationship("Asset", back_populates="sensors")
     component = relationship("Component", back_populates="sensors")
-    organization = relationship("Organization", back_populates="sensors")
+    # organization = relationship("Organization", back_populates="sensors")
     sensor_data = relationship("SensorData", back_populates="sensor")

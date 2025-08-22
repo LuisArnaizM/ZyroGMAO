@@ -3,6 +3,7 @@ from sqlalchemy import Column, Integer, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from typing import Optional
 from app.database.postgres import Base
+from sqlalchemy.sql import func
 
 class SensorData(Base):
     __tablename__ = "sensor_data"
@@ -12,7 +13,7 @@ class SensorData(Base):
     asset_id = Column(Integer, ForeignKey("assets.id"), nullable=True, index=True)  # Opcional
     component_id = Column(Integer, ForeignKey("components.id"), nullable=True, index=True)  # Opcional  
     value = Column(Float, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, server_default=func.now(), nullable=False, index=True)
     
     # Relaciones
     sensor = relationship("Sensor", back_populates="sensor_data")

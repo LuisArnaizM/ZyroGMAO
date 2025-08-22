@@ -51,8 +51,7 @@ async def login_for_access_token(
             "role": user.role,
             "user_id": user.id,
             "first_name": user.first_name,
-            "last_name": user.last_name,
-            "organization_id": user.organization_id
+            "last_name": user.last_name
         },
         expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
     )
@@ -74,7 +73,6 @@ async def login_for_access_token(
             "last_name": user.last_name,
             "email": user.email,
             "role": user.role,
-            "organization_id": user.organization_id,
             "full_name": f"{user.first_name} {user.last_name}"
         }
     }
@@ -85,17 +83,17 @@ async def refresh_access_token(refresh_token: str, db: AsyncSession):
         payload = decode_token(refresh_token)
         email = payload.get("sub")
         token_type = payload.get("type")
-        
+
         if not email or token_type != "refresh":
             raise HTTPException(status_code=401, detail="Invalid refresh token")
-        
+
         # Buscar el usuario
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
-        
+
         if not user or user.is_active == 0:
             raise HTTPException(status_code=401, detail="User not found or inactive")
-        
+
         # Crear nuevo access token
         access_token, exp_access = create_token(
             {
@@ -105,18 +103,17 @@ async def refresh_access_token(refresh_token: str, db: AsyncSession):
                 "user_id": user.id,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
-                "organization_id": user.organization_id
             },
             expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
         )
-        
+
         return {
             "access_token": access_token,
             "token_type": "bearer",
-            "expires_in": exp_access.isoformat()
+            "expires_in": exp_access.isoformat(),
         }
-        
-    except Exception as e:
+
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 async def change_password(user_id: int, change_request: ChangePasswordRequest, db: AsyncSession):
@@ -148,21 +145,13 @@ async def forgot_password(email: str, db: AsyncSession):
     
     # Generar token único
     reset_token = str(uuid.uuid4())
-    
-    # En un modelo real, guardarías este token en la base de datos
-    # Por ahora lo devolvemos para testing
     return {
         "message": "If the email exists, you will receive a password reset link",
-        "reset_token": reset_token,  # Solo para testing - remover en producción
-        "email": email  # Solo para testing - remover en producción
+        "reset_token": reset_token,
+        "email": email
     }
 
 async def reset_password(reset_request: ResetPasswordRequest, db: AsyncSession):
     """Resetear contraseña usando el token"""
-    # En un modelo real, buscarías el token en la base de datos
-    # Por ahora simularemos que el token es válido
-    
-    # Aquí deberías validar el token desde la base de datos
-    # Por simplicidad, asumimos que cualquier token válido resetea la contraseña
-    
+
     return {"message": "Password reset functionality not fully implemented yet"}

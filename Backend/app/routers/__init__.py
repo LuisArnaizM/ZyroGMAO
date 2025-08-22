@@ -6,25 +6,29 @@ Este archivo importa todos los routers para facilitar su importación en main.py
 from . import (
     auth,
     users,
-    organization,
     assets,
     components,  # Nuevo router
     sensors,
     failures,
     maintenance,
     tasks,
-    workorders
+    workorders,
+    department,
+    kpi,
+    inventory
 )
 
 __all__ = [
     "auth",
     "users", 
-    "organization",
     "assets",
     "components",  # Nuevo router
     "sensors",
     "failures",
     "maintenance",
     "tasks",
-    "workorders"
+    "workorders",
+    "department",
+    "kpi",
+    "inventory"
 ]

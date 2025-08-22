@@ -14,7 +14,6 @@ async def create_department(db: AsyncSession, dep_in: DepartmentCreate) -> Depar
         description=dep_in.description,
         parent_id=dep_in.parent_id,
         manager_id=dep_in.manager_id,
-        organization_id=dep_in.organization_id,
         is_active=dep_in.is_active if dep_in.is_active is not None else True,
     )
     db.add(dep)
@@ -51,11 +50,8 @@ async def delete_department(db: AsyncSession, dep_id: int) -> bool:
     return True
 
 
-async def list_departments(db: AsyncSession, organization_id: int | None = None) -> List[Department]:
-    query = select(Department)
-    if organization_id:
-        query = query.where(Department.organization_id == organization_id)
-    result = await db.execute(query)
+async def list_departments(db: AsyncSession) -> List[Department]:
+    result = await db.execute(select(Department))
     return result.scalars().all()
 
 
@@ -73,8 +69,8 @@ def build_tree(departments: List[Department]) -> List[Department]:
     return roots
 
 
-async def get_department_tree(db: AsyncSession, organization_id: int | None = None) -> List[Department]:
-    deps = await list_departments(db, organization_id)
+async def get_department_tree(db: AsyncSession) -> List[Department]:
+    deps = await list_departments(db)
     return build_tree(deps)
 
 

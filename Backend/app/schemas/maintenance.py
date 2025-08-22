@@ -2,24 +2,24 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 from .user import UserReference
+from app.models.enums import MaintenanceType, MaintenanceStatus
 
 class MaintenanceCreate(BaseModel):
     description: str
     asset_id: int
     user_id: int
-    maintenance_type: str = "preventive"
+    maintenance_type: MaintenanceType = MaintenanceType.PREVENTIVE
     scheduled_date: Optional[datetime] = None
     workorder_id: Optional[int] = None
 
 class MaintenanceRead(BaseModel):
     id: int
     description: str
-    status: str
-    maintenance_type: str
+    status: MaintenanceStatus
+    maintenance_type: MaintenanceType
     asset_id: int
     user_id: int
     workorder_id: Optional[int] = None
-    organization_id: int
     scheduled_date: Optional[datetime] = None
     completed_date: Optional[datetime] = None
     duration_hours: Optional[float] = None

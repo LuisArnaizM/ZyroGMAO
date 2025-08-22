@@ -44,7 +44,7 @@ async def create_tables():
     Crea todas las tablas definidas en los modelos.
     """
     try:
-        from app.models import user, organization, asset, sensor, failure, maintenance, task, workorder, sensordata, department
+        from app.models import user, asset, sensor, failure, maintenance, task, workorder, sensordata, department
         
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -55,12 +55,54 @@ async def create_tables():
         logger.error(f"❌ Error creando tablas: {e}")
         raise e
 
+async def apply_simple_migrations():
+    """
+    Aplica migraciones simples idempotentes mediante ALTER TABLE IF NOT EXISTS.
+    Útil para alinear el esquema con cambios menores sin un framework de migraciones completo.
+    """
+    try:
+        async with engine.begin() as conn:
+            # Alinear columnas de tasks
+            await conn.execute(text("""
+                ALTER TABLE IF EXISTS tasks
+                ADD COLUMN IF NOT EXISTS estimated_hours DOUBLE PRECISION;
+            """))
+            await conn.execute(text("""
+                ALTER TABLE IF EXISTS tasks
+                ADD COLUMN IF NOT EXISTS actual_hours DOUBLE PRECISION;
+            """))
+            # Crear tablas de inventario si no existen
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS inventory_items (
+                    id SERIAL PRIMARY KEY,
+                    component_id INTEGER UNIQUE NOT NULL REFERENCES components(id) ON DELETE CASCADE,
+                    quantity DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    unit_cost DOUBLE PRECISION NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NULL
+                );
+            """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS task_used_components (
+                    id SERIAL PRIMARY KEY,
+                    task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                    component_id INTEGER NULL REFERENCES components(id) ON DELETE SET NULL,
+                    quantity DOUBLE PRECISION NOT NULL,
+                    unit_cost_snapshot DOUBLE PRECISION NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+            """))
+        logger.info("✅ Migraciones simples aplicadas")
+    except Exception as e:
+        logger.warning(f"⚠️ Error aplicando migraciones simples: {e}")
+        # No elevar para no romper el arranque; se registró la advertencia
+
 async def drop_tables():
     """
     Elimina todas las tablas de la base de datos.
     """
     try:
-        from app.models import user, organization, asset, sensor, failure, maintenance, task, workorder, sensordata, department
+        from app.models import user, asset, sensor, failure, maintenance, task, workorder, sensordata, department
         
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)

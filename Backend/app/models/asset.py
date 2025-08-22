@@ -2,6 +2,8 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Floa
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database.postgres import Base
+from sqlalchemy import String
+from app.models.enums import AssetStatus
 
 class Asset(Base):
     __tablename__ = "assets"
@@ -13,7 +15,8 @@ class Asset(Base):
     model = Column(String(100))
     serial_number = Column(String(100), unique=True, index=True)
     location = Column(String(200))
-    status = Column(String(50), default="operational")
+    # Persist status as plain string to avoid strict Enum mapping errors with legacy DB values
+    status = Column(String(50), default=AssetStatus.ACTIVE.value, nullable=False)
     
     # Fechas
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -25,11 +28,7 @@ class Asset(Base):
     purchase_cost = Column(Float)
     current_value = Column(Float)
     responsible_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    
-    # Relaciones
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    organization = relationship("Organization", back_populates="assets")
-    
+
     # Usuario responsable
     responsible = relationship("User", back_populates="responsible_assets")
     
@@ -43,3 +42,4 @@ class Asset(Base):
     maintenance_records = relationship("Maintenance", back_populates="asset")
     workorders = relationship("WorkOrder", back_populates="asset")
     tasks = relationship("Task", back_populates="asset")
+    maintenance_plans = relationship("MaintenancePlan", back_populates="asset", cascade="all, delete-orphan")

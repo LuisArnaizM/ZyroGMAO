@@ -13,7 +13,7 @@ from app.controllers.workorder import (
     update_workorder,
     delete_workorder
 )
-from app.auth.dependencies import get_current_user, require_role, get_current_organization
+from app.auth.dependencies import get_current_user, require_role
 
 router = APIRouter(tags=["Work Orders"])
 
@@ -21,23 +21,20 @@ router = APIRouter(tags=["Work Orders"])
 async def create_new_workorder(
     workorder_in: WorkOrderCreate,
     db: AsyncSession = Depends(get_db),
-    user = Depends(require_role(["Admin", "Supervisor"])),
-    organization = Depends(get_current_organization)
+    user = Depends(require_role(["Admin", "Supervisor"]))
 ):
     return await create_workorder(
         db=db,
         workorder_in=workorder_in,
         created_by=user["id"],
-        organization_id=organization.id
     )
 
 @router.get("/{workorder_id}", response_model=WorkOrderRead)
 async def read_workorder(
     workorder_id: int,
-    db: AsyncSession = Depends(get_db),
-    organization = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
-    workorder = await get_workorder(db=db, workorder_id=workorder_id, organization_id=organization.id)
+    workorder = await get_workorder(db=db, workorder_id=workorder_id)
     if not workorder:
         raise HTTPException(status_code=404, detail="Work order not found")
     return workorder
@@ -51,12 +48,10 @@ async def read_workorders(
     work_type: str = Query(None, description="Filtrar por tipo de trabajo"),
     priority: str = Query(None, description="Filtrar por prioridad"),
     assigned_to: int = Query(None, description="Filtrar por usuario asignado"),
-    db: AsyncSession = Depends(get_db),
-    organization = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
     return await get_workorders(
         db=db,
-        organization_id=organization.id,
         page=page,
         page_size=page_size,
         search=search,
@@ -69,32 +64,28 @@ async def read_workorders(
 @router.get("/asset/{asset_id}", response_model=List[WorkOrderRead])
 async def read_workorders_by_asset(
     asset_id: int,
-    db: AsyncSession = Depends(get_db),
-    organization = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
-    return await get_workorders_by_asset(db=db, asset_id=asset_id, organization_id=organization.id)
+    return await get_workorders_by_asset(db=db, asset_id=asset_id)
 
 @router.get("/user/{user_id}", response_model=List[WorkOrderRead])
 async def read_workorders_by_user(
     user_id: int,
-    db: AsyncSession = Depends(get_db),
-    organization = Depends(get_current_organization)
+    db: AsyncSession = Depends(get_db)
 ):
-    return await get_workorders_by_user(db=db, user_id=user_id, organization_id=organization.id)
+    return await get_workorders_by_user(db=db, user_id=user_id)
 
 @router.put("/{workorder_id}", response_model=WorkOrderRead)
 async def update_existing_workorder(
     workorder_id: int,
     workorder_in: WorkOrderUpdate,
     db: AsyncSession = Depends(get_db),
-    user = Depends(require_role(["Admin", "Supervisor", "Tecnico"])),
-    organization = Depends(get_current_organization)
+    user = Depends(require_role(["Admin", "Supervisor", "Tecnico"]))
 ):
     workorder = await update_workorder(
         db=db,
         workorder_id=workorder_id,
         workorder_in=workorder_in,
-        organization_id=organization.id
     )
     if not workorder:
         raise HTTPException(status_code=404, detail="Work order not found")
@@ -104,10 +95,9 @@ async def update_existing_workorder(
 async def delete_existing_workorder(
     workorder_id: int,
     db: AsyncSession = Depends(get_db),
-    user = Depends(require_role(["Admin", "Supervisor"])),
-    organization = Depends(get_current_organization)
+    user = Depends(require_role(["Admin", "Supervisor"]))
 ):
-    result = await delete_workorder(db=db, workorder_id=workorder_id, organization_id=organization.id)
+    result = await delete_workorder(db=db, workorder_id=workorder_id)
     if not result:
         raise HTTPException(status_code=404, detail="Work order not found")
     return {"detail": "Work order deleted successfully"}
