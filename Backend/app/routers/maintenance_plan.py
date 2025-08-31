@@ -42,9 +42,10 @@ async def read_all_maintenance_plans(
     page: int = Query(1, ge=1, description="Página actual"),
     page_size: int = Query(20, ge=1, le=100, description="Número de elementos por página"),
     search: str = Query(None, description="Término de búsqueda para filtrar planes"),
+    asset_id: int = Query(None, description="Filter by asset id"),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_all_maintenance_plans(db=db, page=page, page_size=page_size, search=search)
+    return await get_all_maintenance_plans(db=db, page=page, page_size=page_size, search=search, asset_id=asset_id)
 
 
 @router.put("/{plan_id}", response_model=MaintenancePlanRead)

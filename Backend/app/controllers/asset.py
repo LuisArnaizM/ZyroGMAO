@@ -49,6 +49,13 @@ async def update_asset(db: AsyncSession, asset_id: int, asset_in: AssetUpdate):
     
     update_data = asset_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
+        if key == "status" and value is not None:
+            try:
+                from enum import Enum
+                if isinstance(value, Enum):
+                    value = value.value
+            except ImportError:
+                pass
         setattr(asset, key, value)
     
     await db.commit()

@@ -21,6 +21,13 @@ async def create_workorder(db: AsyncSession, workorder_in: WorkOrderCreate, crea
         failure = await db.execute(select(Failure).where(Failure.id == workorder_in.failure_id))
         if not failure.scalar_one_or_none():
             raise ValueError(f"Failure with ID {workorder_in.failure_id} does not exist in this organization")
+        
+        # Verificar que no existe ya un workorder para esta failure
+        existing_workorder = await db.execute(
+            select(WorkOrder).where(WorkOrder.failure_id == workorder_in.failure_id)
+        )
+        if existing_workorder.scalar_one_or_none():
+            raise ValueError(f"A work order already exists for failure ID {workorder_in.failure_id}")
     
     def to_naive_utc(dt: datetime | None) -> datetime | None:
         if dt is None:
@@ -155,8 +162,20 @@ async def update_workorder(db: AsyncSession, workorder_id: int, workorder_in: Wo
             # obtener usuario asignado
             user_q = await db.execute(select(User).where(User.id == update_data['assigned_to']))
             assigned_user = user_q.scalar_one_or_none()
-            if not assigned_user or assigned_user.department_id not in subtree:
-                raise ValueError("Assigned user does not belong to target department subtree")
+            if not assigned_user:
+                raise ValueError("Assigned user does not exist")
+
+            # Además de comprobar department_id, permitir asignar si el usuario es manager
+            # de algún departamento dentro del subárbol (department.manager_id) o si tiene
+            # rol de Admin/Supervisor.
+            manager_ids = set(d.manager_id for d in deps if d.id in subtree and d.manager_id is not None)
+            user_role = getattr(assigned_user, 'role', None)
+            if not (
+                (assigned_user.department_id in subtree) or
+                (assigned_user.id in manager_ids) or
+                (user_role in ("Admin", "Supervisor"))
+            ):
+                raise ValueError("Assigned user does not belong to target department subtree or have sufficient role")
 
     for key, value in update_data.items():
         setattr(workorder, key, value)

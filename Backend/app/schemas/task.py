@@ -19,8 +19,12 @@ class TaskCreate(BaseModel):
     completion_notes: Optional[str] = None
     assigned_to: Optional[int] = None
     asset_id: Optional[int] = None
-    component_id: Optional[int] = None  # Reemplaza machine_id
+    component_id: Optional[int] = None
     workorder_id: Optional[int] = None
+
+    class Config:
+        use_enum_values = True
+
 
 class TaskRead(BaseModel):
     id: int
@@ -34,7 +38,7 @@ class TaskRead(BaseModel):
     completion_notes: Optional[str] = None
     assigned_to: Optional[int] = None
     asset_id: Optional[int] = None
-    component_id: Optional[int] = None  # Reemplaza machine_id
+    component_id: Optional[int] = None
     workorder_id: Optional[int] = None
     created_by_id: int
     created_at: datetime
@@ -80,6 +84,9 @@ class TaskUpdate(BaseModel):
     component_id: Optional[int] = None  # Reemplaza machine_id
     workorder_id: Optional[int] = None
     used_components: Optional[List[TaskUsedComponentIn]] = None
+    class Config:
+        use_enum_values = True
+
 
 
 class TaskCompleteItemIn(BaseModel):

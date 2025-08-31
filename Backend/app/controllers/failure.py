@@ -7,6 +7,7 @@ from app.schemas.failure import FailureCreate, FailureRead, FailureUpdate
 from datetime import datetime, timezone
 import enum as _py_enum
 from app.models.enums import FailureStatus, FailureSeverity
+from sqlalchemy.orm import selectinload
 
 async def create_failure(db: AsyncSession, failure_in: FailureCreate, reported_by: int):
     """Create a new failure report"""
@@ -98,6 +99,41 @@ async def get_failures(
     result = await db.execute(query)
     return result.scalars().all()
 
+async def get_failures_with_workorder_ids(db: AsyncSession):
+    """Get all failures with their associated workorder IDs"""
+    result = await db.execute(
+        select(Failure).options(selectinload(Failure.workorders))
+    )
+    failures = result.scalars().all()
+    
+    # Transform to include workorder_id for each failure
+    failures_with_wo = []
+    for failure in failures:
+        # Obtener el workorder más reciente si existe
+        most_recent_wo = None
+        if failure.workorders:
+            # Ordenar por ID (el más alto será el más reciente)
+            sorted_workorders = sorted(failure.workorders, key=lambda wo: wo.id, reverse=True)
+            most_recent_wo = sorted_workorders[0]
+        
+        failure_dict = {
+            "id": failure.id,
+            "description": failure.description,
+            "severity": failure.severity,
+            "status": failure.status,
+            "reported_by": failure.reported_by,
+            "reported_date": failure.reported_date,
+            "resolved_date": failure.resolved_date,
+            "asset_id": failure.asset_id,
+            "component_id": failure.component_id,
+            "created_at": failure.created_at,
+            "updated_at": failure.updated_at,
+            # Tomar solo el workorder más reciente o None
+            "workorder_id": most_recent_wo.id if most_recent_wo else None
+        }
+        failures_with_wo.append(failure_dict)
+    
+    return failures_with_wo
 async def get_failures_by_asset(db: AsyncSession, asset_id: int):
     """Get all failures for a specific asset"""
     result = await db.execute(

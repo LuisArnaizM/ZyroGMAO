@@ -8,7 +8,6 @@ from . import (
     users,
     assets,
     components,  # Nuevo router
-    sensors,
     failures,
     maintenance,
     tasks,
@@ -23,7 +22,6 @@ __all__ = [
     "users", 
     "assets",
     "components",  # Nuevo router
-    "sensors",
     "failures",
     "maintenance",
     "tasks",

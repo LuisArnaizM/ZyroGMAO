@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Bool
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database.postgres import Base
+from app.models.enums import TaskStatus, TaskPriority
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -9,10 +10,11 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(200), nullable=False)
     description = Column(Text)
-    status = Column(String(50), default="pending")  # pending, in_progress, completed, cancelled
-    priority = Column(String(20), default="medium")  # low, medium, high
+    status = Column(String(50), default=TaskStatus.PENDING.value)  # PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+    priority = Column(String(20), default=TaskPriority.MEDIUM.value)  # LOW, MEDIUM, HIGH
     due_date = Column(DateTime, nullable=True)
     estimated_hours = Column(Float, nullable=True)
+    actual_hours = Column(Float, nullable=True)
     completion_notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

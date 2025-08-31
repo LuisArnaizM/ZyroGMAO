@@ -36,8 +36,6 @@ class Asset(Base):
     components = relationship("Component", back_populates="asset", cascade="all, delete-orphan")
     
     # Otras relaciones mantenidas para el asset principal
-    sensors = relationship("Sensor", back_populates="asset", cascade="all, delete-orphan")
-    sensor_data = relationship("SensorData", back_populates="asset")
     failures = relationship("Failure", back_populates="asset")
     maintenance_records = relationship("Maintenance", back_populates="asset")
     workorders = relationship("WorkOrder", back_populates="asset")

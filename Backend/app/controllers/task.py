@@ -6,6 +6,7 @@ from app.models.component import Component
 from app.models.workorder import WorkOrder
 from app.schemas.task import TaskCreate, TaskRead, TaskUpdate, TaskCompleteRequest, TaskUsedComponentIn
 from app.models.inventory import InventoryItem, TaskUsedComponent
+from app.models.enums import TaskStatus
 from datetime import datetime, timezone
 
 async def create_task(db: AsyncSession, task_in: TaskCreate, created_by_id: int):
@@ -148,7 +149,7 @@ async def complete_task(db: AsyncSession, task_id: int, data: TaskCompleteReques
         return None
 
     # Si ya está completada, no repetir
-    if getattr(task, "status", None) == "completed":
+    if getattr(task, "status", None) == "COMPLETED":
         return task
 
     # Construir TaskUpdate
@@ -161,7 +162,7 @@ async def complete_task(db: AsyncSession, task_id: int, data: TaskCompleteReques
         ]
 
     update = TaskUpdate(
-        status="completed",
+        status="COMPLETED",
         completion_notes=data.notes,
         description=data.description,
         actual_hours=data.actual_hours,

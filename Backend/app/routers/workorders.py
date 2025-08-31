@@ -42,7 +42,7 @@ async def read_workorder(
 @router.get("/", response_model=List[WorkOrderRead])
 async def read_workorders(
     page: int = Query(1, ge=1, description="Página actual"),
-    page_size: int = Query(20, ge=1, le=100, description="Número de elementos por página"),
+    page_size: int = Query(20, ge=1, le=1000, description="Número de elementos por página"),
     search: str = Query(None, description="Término de búsqueda para filtrar órdenes de trabajo"),
     status: str = Query(None, description="Filtrar por estado"),
     work_type: str = Query(None, description="Filtrar por tipo de trabajo"),

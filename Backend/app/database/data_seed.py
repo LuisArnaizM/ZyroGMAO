@@ -16,8 +16,6 @@ from app.models.department import Department
 from app.models.asset import Asset
 from app.models.component import Component
 from app.models.inventory import InventoryItem, TaskUsedComponent
-from app.models.sensor import Sensor
-from app.models.sensordata import SensorData
 from app.models.failure import Failure
 from app.models.workorder import WorkOrder
 from app.models.task import Task
@@ -417,7 +415,7 @@ async def _create_assets_components_inventory(session: AsyncSession, supervisors
     await session.flush()
 
     # Componentes e inventario
-    component_types = ["motor", "sensor", "pump", "valve", "spindle", "belt", "bearing", "gear", "filter"]
+    component_types = ["motor", "pump", "valve", "spindle", "belt", "bearing", "gear", "filter"]
     components: list[Component] = []
     for asset in assets:
         for j in range(1, 9):  # 8 por asset
@@ -452,40 +450,6 @@ async def _create_assets_components_inventory(session: AsyncSession, supervisors
     await session.flush()
 
     return assets, components
-
-
-async def _create_sensors_and_data(session: AsyncSession, assets: list[Asset]):
-    # Si ya hay suficientes sensores, omitir
-    existing = (await session.execute(select(func.count()).select_from(Sensor))).scalar() or 0
-    if existing >= 30:
-        return
-
-    sensor_types = [
-        ("temperature", "°C", 10, 90),
-        ("pressure", "bar", 0, 20),
-        ("vibration", "mm/s", 0, 50),
-        ("humidity", "%", 0, 100),
-    ]
-    sensors: list[Sensor] = []
-    for asset in assets:
-        for _ in range(2):  # 2 por asset
-            st, unit, mn, mx = random.choice(sensor_types)
-            s = Sensor(
-                name=f"{st.capitalize()} Sensor {asset.id}-{random.randint(1,999)}",
-                sensor_type=st,
-                description=f"{st} sensor for {asset.name}",
-                unit=unit,
-                min_value=float(mn),
-                max_value=float(mx),
-                warning_threshold=float(mn + (mx-mn)*0.7),
-                critical_threshold=float(mn + (mx-mn)*0.85),
-                location=asset.location,
-                status=_to_db_enum(random.choice([AssetStatus.ACTIVE.value, AssetStatus.ACTIVE.value, AssetStatus.MAINTENANCE.value, AssetStatus.INACTIVE.value])),
-                asset_id=asset.id,
-            )
-            sensors.append(s)
-            session.add(s)
-    await session.flush()
 
 
 async def _create_maintenance_plans(session: AsyncSession, assets: list[Asset], components: list[Component]):
@@ -669,14 +633,11 @@ async def seed_database():
             # 3) Activos, componentes e inventario
             assets, components = await _create_assets_components_inventory(session, supervisors, technicians)
 
-            # 4) Sensores y datos de sensores
-            await _create_sensors_and_data(session, assets)
-
-            # 5) Fallos + WOs + Tareas + Mantenimientos + Consumos
+            # 4) Fallos + WOs + Tareas + Mantenimientos + Consumos
             await _create_failures_orders_tasks_maintenance(session, assets, components, supervisors, technicians, departments)
 
             await session.commit()
-            logger.info("✅ Base de datos poblada con dataset amplio (departments, users, assets, components, inventory, sensors, data, failures, WOs, tasks, maintenance)")
+            logger.info("✅ Base de datos poblada con dataset amplio (departments, users, assets, components, inventory, failures, WOs, tasks, maintenance)")
         except Exception as e:
             await session.rollback()
             logger.error(f"❌ Error poblando la base de datos: {e}")

@@ -8,7 +8,7 @@ from app.config import settings
 from app.database.postgres import check_connection, create_tables, apply_simple_migrations
 from app.database.data_seed import seed_database
 from app.routers import (
-    auth, users, assets, sensors,
+    auth, users, assets,
     failures, maintenance, maintenance_plan, tasks, workorders, components, department, kpi, inventory
 )
 
@@ -84,10 +84,9 @@ app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users")
 app.include_router(assets.router, prefix=f"{settings.API_V1_STR}/assets")
 app.include_router(components.router, prefix=f"{settings.API_V1_STR}/components")
 app.include_router(department.router, prefix=f"{settings.API_V1_STR}/department")
-app.include_router(sensors.router, prefix=f"{settings.API_V1_STR}/sensors")
 app.include_router(failures.router, prefix=f"{settings.API_V1_STR}/failures")
-app.include_router(maintenance.router, prefix=f"{settings.API_V1_STR}/maintenance")
 app.include_router(maintenance_plan.router, prefix=f"{settings.API_V1_STR}/maintenance/plans")
+app.include_router(maintenance.router, prefix=f"{settings.API_V1_STR}/maintenance")
 app.include_router(tasks.router, prefix=f"{settings.API_V1_STR}/tasks")
 app.include_router(workorders.router, prefix=f"{settings.API_V1_STR}/workorders")
 app.include_router(kpi.router, prefix=f"{settings.API_V1_STR}/kpi")

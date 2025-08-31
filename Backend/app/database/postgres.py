@@ -44,7 +44,7 @@ async def create_tables():
     Crea todas las tablas definidas en los modelos.
     """
     try:
-        from app.models import user, asset, sensor, failure, maintenance, task, workorder, sensordata, department
+        from app.models import user, asset, failure, maintenance, task, workorder, department
         
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -102,7 +102,7 @@ async def drop_tables():
     Elimina todas las tablas de la base de datos.
     """
     try:
-        from app.models import user, asset, sensor, failure, maintenance, task, workorder, sensordata, department
+        from app.models import user, asset, failure, maintenance, task, workorder, department
         
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)

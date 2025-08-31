@@ -27,11 +27,6 @@ class Settings(BaseSettings):
     POSTGRES_URL: Optional[str] = None
     POSTGRES_URL_DOCKER: Optional[str] = None
     
-    # MongoDB para datos de sensores
-    MONGODB_URL: str = os.getenv("MONGODB_URL", "mongodb://mongo:27017")  # Cambiado de localhost a mongo
-    MONGODB_URL_DOCKER: str = os.getenv("MONGODB_URL_DOCKER", "mongodb://mongo:27017")
-    MONGODB_DB: str = os.getenv("MONGODB_DB", "gmao_sensors")
-    
     # Seguridad
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production")
     ALGORITHM: str = "HS256"
@@ -84,17 +79,6 @@ class Settings(BaseSettings):
             return self.POSTGRES_URL
         # Sino construir la URL usando POSTGRES_SERVER (que será 'db' en Docker)
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-    
-    @property
-    def mongodb_url(self):
-        # Usar MONGODB_URL_DOCKER si está disponible, sino usar MONGODB_URL
-        if self.MONGODB_URL_DOCKER:
-            return self.MONGODB_URL_DOCKER
-        return self.MONGODB_URL
-    
-    @property
-    def mongodb_db(self):
-        return self.MONGODB_DB
     
     @property
     def access_token_expire_minutes(self) -> int:

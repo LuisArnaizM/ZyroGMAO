@@ -173,3 +173,14 @@ async def delete_user(db: AsyncSession, user_id: int):
     await db.delete(user)
     await db.commit()
     return True
+
+async def get_department_managers(db: AsyncSession):
+    """Devuelve los usuarios que son managers de algún departamento."""
+    from app.models.department import Department
+    result = await db.execute(select(Department.manager_id).where(Department.manager_id != None))
+    manager_ids = set(r[0] for r in result.fetchall() if r[0] is not None)
+    if not manager_ids:
+        return []
+    result = await db.execute(select(User).where(User.id.in_(manager_ids)))
+    users = result.scalars().all()
+    return users

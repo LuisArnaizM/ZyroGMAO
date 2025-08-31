@@ -39,7 +39,7 @@ async def get_maintenance_plan(db: AsyncSession, plan_id: int):
     return result.scalar_one_or_none()
 
 
-async def get_all_maintenance_plans(db: AsyncSession, page: int = 1, page_size: int = 20, search: str = None):
+async def get_all_maintenance_plans(db: AsyncSession, page: int = 1, page_size: int = 20, search: str = None, asset_id: int = None):
     offset = (page - 1) * page_size
     query = select(MaintenancePlan)
     if search:
@@ -48,6 +48,8 @@ async def get_all_maintenance_plans(db: AsyncSession, page: int = 1, page_size: 
             (MaintenancePlan.name.ilike(search_term)) |
             (MaintenancePlan.description.ilike(search_term))
         )
+    if asset_id is not None:
+        query = query.where(MaintenancePlan.asset_id == asset_id)
     query = query.offset(offset).limit(page_size)
     result = await db.execute(query)
     return result.scalars().all()

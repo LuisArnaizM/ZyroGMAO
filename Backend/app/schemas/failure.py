@@ -2,22 +2,20 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 from .user import UserReference
-from app.models.enums import FailureSeverity, FailureStatus
 
 
 class FailureCreate(BaseModel):
     description: str
     asset_id: Optional[int] = None
     component_id: Optional[int] = None
-    severity: FailureSeverity = FailureSeverity.MEDIUM
+    severity: str = "MEDIUM"
 
 
 class FailureRead(BaseModel):
     id: int
     description: str
-    # 'PENDING' | 'INVESTIGATING' | 'RESOLVED' | ...
-    status: FailureStatus
-    severity: FailureSeverity
+    status: str
+    severity: str
     asset_id: Optional[int] = None
     component_id: Optional[int] = None
     reported_by: int
@@ -40,8 +38,26 @@ class FailureReadWithUser(FailureRead):
 
 class FailureUpdate(BaseModel):
     description: Optional[str] = None
-    # Use enum types on input where possible; Pydantic will coerce
-    status: Optional[FailureStatus] = None
-    severity: Optional[FailureSeverity] = None
+    # Use string types for consistency
+    status: Optional[str] = None
+    severity: Optional[str] = None
     resolved_date: Optional[datetime] = None
     resolution_notes: Optional[str] = None
+
+
+class FailureWithWorkOrder(BaseModel):
+    id: int
+    description: str
+    severity: str
+    status: str
+    reported_by: int
+    reported_date: datetime
+    resolved_date: Optional[datetime] = None
+    asset_id: Optional[int] = None
+    component_id: Optional[int] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    workorder_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True

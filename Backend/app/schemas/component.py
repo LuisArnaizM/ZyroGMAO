@@ -77,7 +77,6 @@ class ComponentDetail(ComponentRead):
     responsible_name: Optional[str] = None
     
     # Estadísticas del componente
-    total_sensors: Optional[int] = 0
     total_failures: Optional[int] = 0
     total_maintenance_records: Optional[int] = 0
     total_tasks: Optional[int] = 0

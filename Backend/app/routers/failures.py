@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
+from app.controllers.failure import get_failures_with_workorder_ids
+from app.schemas.failure import FailureWithWorkOrder
 
 from app.database.postgres import get_db
 from app.schemas.failure import FailureCreate, FailureRead, FailureUpdate
@@ -23,6 +25,13 @@ async def create_new_failure(
     user = Depends(require_role(["Admin", "Supervisor", "Tecnico"]))
 ):
     return await create_failure(db=db, failure_in=failure_in, reported_by=user["id"])
+
+@router.get("/with-workorders", response_model=List[FailureWithWorkOrder])
+async def get_failures_with_workorders(
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all failures with their associated workorder IDs"""
+    return await get_failures_with_workorder_ids(db)
 
 @router.get("/{failure_id}", response_model=FailureRead)
 async def read_failure(
@@ -85,3 +94,4 @@ async def delete_existing_failure(
     if not result:
         raise HTTPException(status_code=404, detail="Failure not found")
     return {"detail": "Failure deleted successfully"}
+

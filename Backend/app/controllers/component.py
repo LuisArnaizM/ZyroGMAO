@@ -52,7 +52,6 @@ async def get_component(db: AsyncSession, component_id: int):
     ).options(
         selectinload(Component.asset),
         selectinload(Component.responsible),
-        selectinload(Component.sensors),
         selectinload(Component.failures),
         selectinload(Component.maintenance_records),
         selectinload(Component.tasks)
@@ -121,7 +120,6 @@ async def get_component_statistics(db: AsyncSession, component_id: int):
     
     stats = {
         "component_id": component_id,
-        "total_sensors": len(component.sensors) if component.sensors else 0,
         "total_failures": len(component.failures) if component.failures else 0,
         "total_maintenance_records": len(component.maintenance_records) if component.maintenance_records else 0,
         "total_tasks": len(component.tasks) if component.tasks else 0,

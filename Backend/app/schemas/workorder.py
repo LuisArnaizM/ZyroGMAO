@@ -2,14 +2,13 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 from .user import UserReference
-from app.models.enums import WorkOrderType, WorkOrderStatus, WorkOrderPriority
 
 class WorkOrderCreate(BaseModel):
     title: str
     description: Optional[str] = None
-    work_type: WorkOrderType  # preventive, corrective, emergency
-    status: WorkOrderStatus = WorkOrderStatus.OPEN
-    priority: WorkOrderPriority = WorkOrderPriority.MEDIUM
+    work_type: str  # preventive, corrective, emergency
+    status: str = "OPEN"
+    priority: str = "MEDIUM"
     estimated_hours: Optional[float] = None
     estimated_cost: Optional[float] = None
     scheduled_date: Optional[datetime] = None
@@ -22,9 +21,9 @@ class WorkOrderRead(BaseModel):
     id: int
     title: str
     description: Optional[str] = None
-    work_type: WorkOrderType
-    status: WorkOrderStatus
-    priority: WorkOrderPriority
+    work_type: str
+    status: str
+    priority: str
     estimated_hours: Optional[float] = None
     actual_hours: Optional[float] = None
     estimated_cost: Optional[float] = None

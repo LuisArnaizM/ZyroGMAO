@@ -40,8 +40,6 @@ class Component(Base):
     responsible = relationship("User", back_populates="responsible_components")
     
     # Relaciones con otros modelos que antes dependían de Machine
-    sensors = relationship("Sensor", back_populates="component", cascade="all, delete-orphan")
-    sensor_data = relationship("SensorData", back_populates="component")
     failures = relationship("Failure", back_populates="component")
     maintenance_records = relationship("Maintenance", back_populates="component")
     tasks = relationship("Task", back_populates="component")

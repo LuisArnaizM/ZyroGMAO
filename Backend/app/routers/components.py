@@ -85,7 +85,6 @@ async def get_component_endpoint(
         # Convertir a ComponentDetail
         component_dict = {
             **component.__dict__,
-            "total_sensors": stats["total_sensors"],
             "total_failures": stats["total_failures"],
             "total_maintenance_records": stats["total_maintenance_records"],
             "total_tasks": stats["total_tasks"],
