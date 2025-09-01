@@ -344,6 +344,19 @@ async def _ensure_users(session: AsyncSession, departments: list[Department]) ->
         session.add(u)
 
     await session.flush()
+    # Asignar managers determinísticos a algunos departamentos si vacíos
+    dep_map = {d.name: d for d in departments}
+    supervisors = [u for u in (await session.execute(select(User))).scalars().all() if u.role == "Supervisor"]
+    # Orden estable
+    supervisors.sort(key=lambda x: x.id)
+    if supervisors:
+        if dep_map.get("Maintenance") and not dep_map["Maintenance"].manager_id:
+            dep_map["Maintenance"].manager_id = supervisors[0].id
+        if len(supervisors) > 1 and dep_map.get("Production") and not dep_map["Production"].manager_id:
+            dep_map["Production"].manager_id = supervisors[1].id
+        if len(supervisors) > 2 and dep_map.get("IT") and not dep_map["IT"].manager_id:
+            dep_map["IT"].manager_id = supervisors[2].id
+        await session.flush()
     return roles
 
 
@@ -507,42 +520,93 @@ async def _create_failures_orders_tasks_maintenance(
 
     all_tasks: list[Task] = []
 
-    # Fallos por asset
+    # Fallos por asset (creamos un histórico temporal consistente para KPIs MTBF/MTTF)
     failures_by_asset: dict[int, list[Failure]] = {}
+    horizon_days = 120  # ~4 meses hacia atrás
+    base_start = now - timedelta(days=horizon_days)
     for asset in assets:
         failures_for_asset: list[Failure] = []
-        for _ in range(random.randint(1, 3)):
+        # Número de fallos controlado para generar gaps (entre 4 y 8)
+        num_failures = random.randint(4, 8)
+        failure_times = sorted([
+            base_start + timedelta(days=random.uniform(0, horizon_days)) for _ in range(num_failures)
+        ])
+        prev_resolved: datetime | None = None
+        for ft in failure_times:
             comp_candidates = [c for c in components if c.asset_id == asset.id]
             comp = random.choice(comp_candidates) if comp_candidates else None
+            reported_date = ft
+            # Duración de fallo entre 2h y 48h
+            repair_hours = random.uniform(2, 48)
+            resolved_date = reported_date + timedelta(hours=repair_hours)
+            # Estado final (60% resolved, 30% investigating, 10% pending)
+            status_choice = random.choices(
+                population=[FailureStatus.RESOLVED.value, FailureStatus.INVESTIGATING.value, FailureStatus.PENDING.value],
+                weights=[0.6, 0.3, 0.1],
+                k=1
+            )[0]
+            if status_choice != FailureStatus.RESOLVED.value:
+                # Algunas no resueltas aún: quitar resolved_date parcialmente
+                if random.random() < 0.5:  # noqa: S311
+                    resolved_date = None
+            severity_choice = random.choices(
+                population=[FailureSeverity.LOW.value, FailureSeverity.MEDIUM.value, FailureSeverity.HIGH.value, FailureSeverity.CRITICAL.value],
+                weights=[0.25, 0.4, 0.25, 0.10],
+                k=1
+            )[0]
             f = Failure(
                 description=f"Failure on {asset.name}{' - '+comp.name if comp else ''}",
-                status=_to_db_enum(random.choice([FailureStatus.PENDING.value, FailureStatus.INVESTIGATING.value, FailureStatus.RESOLVED.value])),
-                severity=_to_db_enum(random.choice([FailureSeverity.LOW.value, FailureSeverity.MEDIUM.value, FailureSeverity.HIGH.value, FailureSeverity.CRITICAL.value])),
+                status=_to_db_enum(status_choice),
+                severity=_to_db_enum(severity_choice),
                 asset_id=asset.id,
                 component_id=comp.id if comp else None,
                 reported_by=(random.choice(supervisors + technicians).id if (supervisors + technicians) else None),
+                reported_date=_to_naive(reported_date),
+                resolved_date=_to_naive(resolved_date),
             )
             failures_for_asset.append(f)
             session.add(f)
+            prev_resolved = resolved_date or prev_resolved
         failures_by_asset[asset.id] = failures_for_asset
 
     for asset in assets:
-        for k in range(1, 11):  # 10 WO por asset
+        # Espaciamos WO a lo largo del horizonte temporal
+        wo_count = 12
+        wo_times = sorted([
+            now - timedelta(days=random.uniform(0, 110)) for _ in range(wo_count)
+        ])
+        for k, created_at in enumerate(wo_times, start=1):
             dep = random.choice(departments)
             failure = random.choice(failures_by_asset.get(asset.id, [None]) + [None])
+            status_choice = random.choices(
+                population=[WorkOrderStatus.OPEN.value, WorkOrderStatus.IN_PROGRESS.value, WorkOrderStatus.COMPLETED.value, WorkOrderStatus.CANCELLED.value],
+                weights=[0.25, 0.20, 0.45, 0.10],
+                k=1
+            )[0]
+            scheduled_offset = random.uniform(-5, 15)
+            scheduled_date = created_at + timedelta(days=scheduled_offset)
+            started_date = None
+            completed_date = None
+            if status_choice in (WorkOrderStatus.IN_PROGRESS.value, WorkOrderStatus.COMPLETED.value):
+                started_date = created_at + timedelta(hours=random.uniform(0.5, 24))
+            if status_choice == WorkOrderStatus.COMPLETED.value:
+                completed_date = (started_date or created_at) + timedelta(hours=random.uniform(1, 72))
             wo = WorkOrder(
                 title=f"WO-{asset.id}-{k}",
                 description=f"Maintenance #{k} for {asset.name}",
                 work_type=_to_db_enum(random.choice([WorkOrderType.REPAIR.value, WorkOrderType.MAINTENANCE.value, WorkOrderType.INSPECTION.value])),
-                status=_to_db_enum(random.choice([WorkOrderStatus.OPEN.value, WorkOrderStatus.IN_PROGRESS.value, WorkOrderStatus.COMPLETED.value, WorkOrderStatus.CANCELLED.value])),
+                status=_to_db_enum(status_choice),
                 priority=_to_db_enum(random.choice([WorkOrderPriority.LOW.value, WorkOrderPriority.MEDIUM.value, WorkOrderPriority.HIGH.value])),
                 asset_id=asset.id,
                 assigned_to=(random.choice(technicians).id if technicians else None),
                 created_by=(random.choice(supervisors).id if supervisors else None),
-                scheduled_date=_to_naive(now - timedelta(days=random.randint(0, 120)) + timedelta(days=random.randint(-5, 20))),
+                scheduled_date=_to_naive(scheduled_date),
                 department_id=dep.id,
                 failure_id=(failure.id if failure else None),
                 estimated_hours=round(random.uniform(2.0, 16.0), 1),
+                created_at=_to_naive(created_at),
+                started_date=_to_naive(started_date),
+                completed_date=_to_naive(completed_date),
             )
             session.add(wo)
             await session.flush()
@@ -552,20 +616,80 @@ async def _create_failures_orders_tasks_maintenance(
             for t in range(num_tasks):
                 comp_candidates = [c for c in components if c.asset_id == asset.id]
                 comp = random.choice(comp_candidates) if comp_candidates else None
-                status = _to_db_enum(random.choice([TaskStatus.PENDING.value, TaskStatus.IN_PROGRESS.value, TaskStatus.COMPLETED.value]))
-                due = _to_naive(now + timedelta(days=random.randint(-30, 45)))
+                task_status = random.choices(
+                    population=[TaskStatus.PENDING.value, TaskStatus.IN_PROGRESS.value, TaskStatus.COMPLETED.value],
+                    weights=[0.3, 0.3, 0.4],
+                    k=1
+                )[0]
+                # Tiempos relativos a created_at del WO
+                task_created = created_at + timedelta(hours=random.uniform(0, 48))
+                # Simulamos horas reales sólo si completada
+                actual_hours = None
+                if task_status == TaskStatus.COMPLETED.value:
+                    actual_hours = round(random.uniform(0.5, 10.0), 1)
+                due = task_created + timedelta(days=random.uniform(1, 30))
+                est_hours = round(random.uniform(1.0, 6.0), 1)
+                assigned_user_id = (random.choice(technicians).id if technicians else None)
+                if assigned_user_id:
+                    from app.models.calendar import UserWorkingDay, UserSpecialDay
+                    # Cache patrones
+                    if not hasattr(session, '_seed_work_pattern'):
+                        session._seed_work_pattern = {}
+                    if assigned_user_id not in session._seed_work_pattern:
+                        rows = (await session.execute(select(UserWorkingDay).where(UserWorkingDay.user_id==assigned_user_id))).scalars().all()
+                        if not rows:
+                            for wd in range(7):
+                                session.add(UserWorkingDay(user_id=assigned_user_id, weekday=wd, hours=(8.0 if wd < 5 else 0.0), is_active=True))
+                            await session.flush()
+                            rows = (await session.execute(select(UserWorkingDay).where(UserWorkingDay.user_id==assigned_user_id))).scalars().all()
+                        session._seed_work_pattern[assigned_user_id] = {r.weekday: (r.hours if r.is_active else 0.0) for r in rows}
+                    pattern = session._seed_work_pattern[assigned_user_id]
+                    # Cache días especiales
+                    if not hasattr(session, '_seed_specials'):
+                        specials = (await session.execute(select(UserSpecialDay))).scalars().all()
+                        session._seed_specials = {(s.user_id, s.date): s for s in specials}
+                    special_map = session._seed_specials
+                    attempts = 0
+                    while attempts < 20:
+                        d_date = due.date()
+                        spec = special_map.get((assigned_user_id, d_date))
+                        weekday = d_date.weekday()
+                        base_hours = pattern.get(weekday, 0.0)
+                        # Capacidad día
+                        if spec:
+                            if not spec.is_working or (spec.is_working and spec.hours is not None and spec.hours <= 0):
+                                due = due + timedelta(days=1)
+                                attempts += 1
+                                continue
+                            cap_day = spec.hours if spec.hours is not None else base_hours
+                        else:
+                            cap_day = base_hours
+                        if cap_day <= 0:
+                            due = due + timedelta(days=1)
+                            attempts += 1
+                            continue
+                        planned = 0.0
+                        for existing in all_tasks:
+                            if existing.assigned_to == assigned_user_id and existing.due_date and existing.due_date.date() == d_date:
+                                planned += existing.estimated_hours or 0.0
+                        if planned + est_hours <= cap_day + 1e-6:
+                            break
+                        due = due + timedelta(days=1)
+                        attempts += 1
                 task = Task(
                     title=f"Task {wo.id}-{t+1}{' on '+comp.name if comp else ''}",
                     description=f"Perform action {t+1} on {asset.name}",
-                    status=status,
+                    status=_to_db_enum(task_status),
                     priority=_to_db_enum(random.choice([TaskPriority.LOW.value, TaskPriority.MEDIUM.value, TaskPriority.HIGH.value])),
-                    estimated_hours=round(random.uniform(1.0, 8.0), 1),
-                    assigned_to=(random.choice(technicians).id if technicians else None),
+                    estimated_hours=est_hours,
+                    assigned_to=assigned_user_id,
                     created_by_id=(random.choice(supervisors).id if supervisors else None),
                     asset_id=asset.id,
                     component_id=comp.id if comp else None,
                     workorder_id=wo.id,
-                    due_date=due,
+                    due_date=_to_naive(due),
+                    created_at=_to_naive(task_created),
+                    actual_hours=actual_hours,
                 )
                 session.add(task)
                 all_tasks.append(task)
@@ -590,11 +714,18 @@ async def _create_failures_orders_tasks_maintenance(
         session.add(maint)
     await session.flush()
 
-    # Consumos de inventario en ~30% de tareas
+    # Consumos de inventario en ~30% de tareas distribuidos últimos 30 días
+    from app.models.calendar import UserSpecialDay, UserWorkingDay
     inv_map = {inv.component_id: inv for inv in (await session.execute(select(InventoryItem))).scalars().all()}
-    for task in random.sample(all_tasks, max(1, int(len(all_tasks) * 0.3))):
+    usage_tasks = random.sample(all_tasks, max(1, int(len(all_tasks) * 0.3)))
+    today = datetime.now(timezone.utc).date()
+    for idx, task in enumerate(usage_tasks):
+        day_offset = idx % 30
+        usage_date = today - timedelta(days=day_offset)
+        usage_dt = datetime.combine(usage_date, datetime.min.time(), tzinfo=timezone.utc)
         comps_same_asset = [c for c in components if c.asset_id == task.asset_id]
-        for comp in random.sample(comps_same_asset, k=min(len(comps_same_asset), random.choice([1, 1, 2]))):
+        sample_count = min(len(comps_same_asset), random.choice([1, 1, 2]))
+        for comp in random.sample(comps_same_asset, k=sample_count):
             inv = inv_map.get(comp.id)
             if not inv or (inv.quantity or 0) <= 0:
                 continue
@@ -606,9 +737,230 @@ async def _create_failures_orders_tasks_maintenance(
                 component_id=comp.id,
                 quantity=qty_use,
                 unit_cost_snapshot=inv.unit_cost,
+                created_at=_to_naive(usage_dt),
             )
             session.add(tuc)
             inv.quantity = float(inv.quantity) - qty_use
+
+    # NOTA: El ajuste definitivo de due_date evitando días no laborables (patrón + especiales)
+    # se realiza fuera (ver _adjust_task_due_dates) para poder reutilizarlo incluso cuando
+    # el seed detecta ya muchas tareas y solo queremos corregir fechas.
+
+
+async def _ensure_calendar_demo_data(session: AsyncSession, supervisors: list[User], technicians: list[User]):
+    """Crea algunos días especiales/vacaciones de ejemplo si aún no existen.
+
+    Se ejecuta siempre (idempotente) antes de generar tareas para que las fechas
+    se puedan ajustar adecuadamente.
+    """
+    from app.models.calendar import UserSpecialDay
+    today = datetime.now(timezone.utc).date()
+    year_start = today.replace(month=1, day=1)
+    try:
+        # Vacaciones supervisor principal: semana 30 (aprox fin Julio)
+        if supervisors:
+            sup = supervisors[0]
+            vac_start = year_start + timedelta(days=29*7)  # aprox semana 30 inicio
+            for i in range(5):
+                d = vac_start + timedelta(days=i)
+                if not (await session.execute(select(UserSpecialDay).where(UserSpecialDay.user_id==sup.id, UserSpecialDay.date==d))).scalar_one_or_none():
+                    session.add(UserSpecialDay(user_id=sup.id, date=d, is_working=False, hours=0.0, reason="Vacaciones"))
+        # Festivo global (1 Mayo) para primeros técnicos
+        try:
+            may1 = today.replace(month=5, day=1)
+        except ValueError:
+            # Si hoy es 29/30 Feb (no aplicaría), elegir 1 Junio como fallback
+            may1 = today.replace(month=6, day=1)
+        for tech in technicians[:5]:
+            if not (await session.execute(select(UserSpecialDay).where(UserSpecialDay.user_id==tech.id, UserSpecialDay.date==may1))).scalar_one_or_none():
+                session.add(UserSpecialDay(user_id=tech.id, date=may1, is_working=False, hours=0.0, reason="Día del Trabajador"))
+        # Media jornada de formación en 3 días para primer técnico
+        if technicians:
+            d_partial = today + timedelta(days=3)
+            t0 = technicians[0]
+            if not (await session.execute(select(UserSpecialDay).where(UserSpecialDay.user_id==t0.id, UserSpecialDay.date==d_partial))).scalar_one_or_none():
+                session.add(UserSpecialDay(user_id=t0.id, date=d_partial, is_working=True, hours=4.0, reason="Formación"))
+        await session.flush()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Calendario demo parcial omitido: {e}")
+
+
+async def _adjust_task_due_dates(session: AsyncSession):
+    """Ajusta due_date de tareas que caigan en días no laborables para el usuario asignado.
+
+    Considera:
+      - Días especiales (UserSpecialDay) no laborables
+      - Patrón de UserWorkingDay (weekday con 0 horas => no laborable)
+    Desplaza la fecha al siguiente día laborable hasta 10 intentos (seguridad).
+    """
+    from app.models.calendar import UserSpecialDay, UserWorkingDay
+    tasks = (await session.execute(select(Task).where(Task.assigned_to.isnot(None), Task.due_date.isnot(None)))).scalars().all()
+    if not tasks:
+        return
+    # Cache patrones y especiales por usuario
+    # Especiales: map (user_id, date)->is_working,hours
+    specials = (await session.execute(select(UserSpecialDay))).scalars().all()
+    special_map = {(s.user_id, s.date): s for s in specials}
+    # Working pattern por user: weekday->hours
+    working_by_user: dict[int, dict[int, float]] = {}
+    changed = 0
+    for task in tasks:
+        if not task.due_date:
+            continue
+        uid = task.assigned_to
+        if uid is None:
+            continue
+        # Cargar patrón on-demand
+        if uid not in working_by_user:
+            rows = (await session.execute(select(UserWorkingDay).where(UserWorkingDay.user_id==uid))).scalars().all()
+            if not rows:
+                # crear por defecto (Mon-Fri 8h)
+                for wd in range(7):
+                    session.add(UserWorkingDay(user_id=uid, weekday=wd, hours=(8.0 if wd < 5 else 0.0), is_active=True))
+                await session.flush()
+                rows = (await session.execute(select(UserWorkingDay).where(UserWorkingDay.user_id==uid))).scalars().all()
+            working_by_user[uid] = {r.weekday: (r.hours if r.is_active else 0.0) for r in rows}
+        # Evaluar la fecha
+        attempts = 0
+        while attempts < 10:
+            due_date_date = task.due_date.date()
+            spec = special_map.get((uid, due_date_date))
+            if spec:
+                if not spec.is_working:  # Día especial no laborable
+                    task.due_date = task.due_date + timedelta(days=1)
+                    attempts += 1
+                    continue
+                # Si is_working True y hours None -> usar patrón por defecto; si horas 0 => no laborable
+                if spec.is_working and spec.hours is not None and spec.hours <= 0:
+                    task.due_date = task.due_date + timedelta(days=1)
+                    attempts += 1
+                    continue
+                break  # es laborable especial
+            # No especial: usar patrón weekday
+            weekday = due_date_date.weekday()
+            hours = working_by_user[uid].get(weekday, 0.0)
+            if hours <= 0.0:
+                task.due_date = task.due_date + timedelta(days=1)
+                attempts += 1
+                continue
+            break
+        if attempts and attempts < 10:
+            changed += 1
+    if changed:
+        logger.info("Ajustadas %s due_date de tareas no laborables", changed)
+        await session.flush()
+
+
+async def _rebalance_task_capacity(session: AsyncSession):
+    """Redistribuye tareas que exceden la capacidad diaria moviéndolas a días siguientes con hueco.
+
+    Estrategia greedy:
+      - Agrupar tareas por (user, fecha) ordenadas por due_date y luego id.
+      - Calcular carga acumulada; si se excede capacidad, desplazar tareas excedentes
+        al siguiente día laborable con hueco (respetando días no laborables / especiales)
+        hasta 30 días hacia adelante para evitar loops infinitos.
+    """
+    from app.models.calendar import UserSpecialDay, UserWorkingDay
+    tasks = (await session.execute(select(Task).where(Task.assigned_to.isnot(None), Task.due_date.isnot(None)))).scalars().all()
+    if not tasks:
+        return
+    # Cache patrones y especiales
+    specials = (await session.execute(select(UserSpecialDay))).scalars().all()
+    special_map = {(s.user_id, s.date): s for s in specials}
+    working_by_user: dict[int, dict[int, float]] = {}
+    # Agrupar por usuario y ordenar por fecha
+    tasks.sort(key=lambda x: (x.assigned_to, x.due_date, x.id))
+    by_user: dict[int, list[Task]] = {}
+    for t in tasks:
+        by_user.setdefault(t.assigned_to, []).append(t)
+    moved = 0
+    for uid, user_tasks in by_user.items():
+        # patrón
+        if uid not in working_by_user:
+            rows = (await session.execute(select(UserWorkingDay).where(UserWorkingDay.user_id==uid))).scalars().all()
+            if not rows:
+                for wd in range(7):
+                    session.add(UserWorkingDay(user_id=uid, weekday=wd, hours=(8.0 if wd < 5 else 0.0), is_active=True))
+                await session.flush()
+                rows = (await session.execute(select(UserWorkingDay).where(UserWorkingDay.user_id==uid))).scalars().all()
+            working_by_user[uid] = {r.weekday: (r.hours if r.is_active else 0.0) for r in rows}
+        pattern = working_by_user[uid]
+        # Recalcular iterativamente hasta que ningún día se exceda (máx 3 pasadas)
+        for _pass in range(3):
+            overload_found = False
+            # Reagrupar por fecha
+            day_map: dict[datetime.date, list[Task]] = {}
+            for t in user_tasks:
+                day_map.setdefault(t.due_date.date(), []).append(t)
+            for d, tlist in list(day_map.items()):
+                # Obtener capacidad día
+                spec = special_map.get((uid, d))
+                weekday = d.weekday()
+                base_hours = pattern.get(weekday, 0.0)
+                if spec:
+                    if not spec.is_working or (spec.is_working and spec.hours is not None and spec.hours <= 0):
+                        cap = 0.0
+                    else:
+                        cap = spec.hours if spec.hours is not None else base_hours
+                else:
+                    cap = base_hours
+                if cap <= 0:
+                    # mover todas las tareas de este día
+                    moving = tlist
+                else:
+                    # comprobar carga
+                    total = sum((t.estimated_hours or 0.0) for t in tlist)
+                    if total <= cap + 1e-6:
+                        continue
+                    overload_found = True
+                    # ordenar por id descendente para mover las más recientes primero
+                    tlist_sorted = sorted(tlist, key=lambda x: (x.due_date, x.id), reverse=True)
+                    moving = []
+                    current = total
+                    for mt in tlist_sorted:
+                        moving.append(mt)
+                        current -= (mt.estimated_hours or 0.0)
+                        if current <= cap + 1e-6:
+                            break
+                # Reubicar tareas en moving
+                for mt in moving:
+                    attempts = 0
+                    new_due = mt.due_date + timedelta(days=1)
+                    while attempts < 30:
+                        nd = new_due.date()
+                        spec2 = special_map.get((uid, nd))
+                        weekday2 = nd.weekday()
+                        base2 = pattern.get(weekday2, 0.0)
+                        if spec2:
+                            if not spec2.is_working or (spec2.is_working and spec2.hours is not None and spec2.hours <= 0):
+                                new_due += timedelta(days=1)
+                                attempts += 1
+                                continue
+                            cap2 = spec2.hours if spec2.hours is not None else base2
+                        else:
+                            cap2 = base2
+                        if cap2 <= 0:
+                            new_due += timedelta(days=1)
+                            attempts += 1
+                            continue
+                        # calcular carga ya planificada allí (incluyendo tareas movidas anteriormente en este loop)
+                        load2 = 0.0
+                        for oth in user_tasks:
+                            if oth is mt:
+                                continue
+                            if oth.due_date.date() == nd:
+                                load2 += (oth.estimated_hours or 0.0)
+                        if load2 + (mt.estimated_hours or 0.0) <= cap2 + 1e-6:
+                            mt.due_date = new_due
+                            moved += 1
+                            break
+                        new_due += timedelta(days=1)
+                        attempts += 1
+            if not overload_found:
+                break
+    if moved:
+        logger.info("Rebalanceo de capacidad: %s tareas movidas a días posteriores", moved)
+        await session.flush()
 
 
 async def seed_database():
@@ -621,27 +973,40 @@ async def seed_database():
             await session.commit()
             # Si ya hay suficientes tareas, asumir que está poblado amplio
             tasks_cnt = (await session.execute(select(func.count()).select_from(Task))).scalar() or 0
-            if tasks_cnt and tasks_cnt >= 400:
-                logger.info("ℹ️ Seed: ya existen %s+ tareas, se omite repoblado", tasks_cnt)
-                return
 
-            # 1) Departamentos
+            # 1) Departamentos (siempre asegurar)
             departments = await _ensure_departments(session)
 
-            # 2) Usuarios por rol
+            # 2) Usuarios por rol (siempre asegurar)
             roles = await _ensure_users(session, departments)
-            admins = roles.get("Admin", [])
             supervisors = roles.get("Supervisor", [])
             technicians = roles.get("Tecnico", [])
 
-            # 3) Activos, componentes e inventario
+            # 3) Calendario demo (ANTES de generar tareas para poder ajustar due_date en creación)
+            await _ensure_calendar_demo_data(session, supervisors, technicians)
+
+            if tasks_cnt and tasks_cnt >= 400:
+                # Dataset grande ya existe: sólo aseguramos assets/components base y corregimos due_date si hiciera falta
+                logger.info("ℹ️ Seed: %s tareas existentes, solo se aplicarán correcciones de calendario", tasks_cnt)
+                # Asegurar assets/components (no crea adicionales si ya hay suficientes)
+                await _create_assets_components_inventory(session, supervisors, technicians)
+                await _adjust_task_due_dates(session)
+                await _rebalance_task_capacity(session)
+                await session.commit()
+                return
+
+            # 4) Activos, componentes e inventario
             assets, components = await _create_assets_components_inventory(session, supervisors, technicians)
 
-            # 4) Fallos + WOs + Tareas + Mantenimientos + Consumos
+            # 5) Fallos + WOs + Tareas + Mantenimientos + Consumos
             await _create_failures_orders_tasks_maintenance(session, assets, components, supervisors, technicians, departments)
 
+            # 6) Ajuste final de due_date evitando días no laborables (patrón + especiales)
+            await _adjust_task_due_dates(session)
+            await _rebalance_task_capacity(session)
+
             await session.commit()
-            logger.info("✅ Base de datos poblada con dataset amplio (departments, users, assets, components, inventory, failures, WOs, tasks, maintenance)")
+            logger.info("✅ Base de datos poblada y due_date ajustadas evitando días no laborables")
         except Exception as e:
             await session.rollback()
             logger.error(f"❌ Error poblando la base de datos: {e}")

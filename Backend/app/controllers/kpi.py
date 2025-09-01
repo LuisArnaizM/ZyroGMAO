@@ -16,6 +16,8 @@ from app.schemas.kpi import (
     AssetKpi,
     WorkOrderKpi,
     FailureKpi,
+    MonthlyResponseSeries,
+    MonthlyResponsePoint,
 )
 from app.models.asset import Asset
 
@@ -100,22 +102,37 @@ async def get_kpi_summary(db: AsyncSession) -> KpiSummary:
 
     planned_pct = float(planned_count or 0) / float(total or 1) * 100.0
 
-    # MTBF: tiempo entre fallos resueltos (promedio), usando Failure.resolved_date
-    # Calculado como media de diferencias entre fallos consecutivos resueltos
-    failures_q = select(Failure.resolved_date).where(
-        Failure.resolved_date.isnot(None)
-    ).order_by(Failure.resolved_date.asc())
-
-    failures_res = await db.execute(failures_q)
-    resolved_dates: List[datetime] = [row[0] for row in failures_res.all()]
+    # MTBF: media entre fechas de resolución consecutivas
+    failures_resolved_q = select(Failure.resolved_date).where(Failure.resolved_date.isnot(None)).order_by(Failure.resolved_date.asc())
+    res_resolved = await db.execute(failures_resolved_q)
+    resolved_dates: List[datetime] = [r[0] for r in res_resolved.all()]
     mtbf_hours = None
     if len(resolved_dates) >= 2:
-        gaps = [
-            (resolved_dates[i] - resolved_dates[i - 1]).total_seconds() / 3600.0
-            for i in range(1, len(resolved_dates))
-        ]
-        if gaps:
-            mtbf_hours = sum(gaps) / len(gaps)
+        mtbf_gaps = [ (resolved_dates[i]-resolved_dates[i-1]).total_seconds()/3600.0 for i in range(1,len(resolved_dates)) ]
+        if mtbf_gaps:
+            mtbf_hours = sum(mtbf_gaps)/len(mtbf_gaps)
+
+    # MTTF: media entre (resolved_date de fallo i) y (reported_date del fallo i+1) cuando el resuelto ocurre antes del siguiente reporte
+    failures_report_q = select(Failure.reported_date, Failure.resolved_date).where(Failure.reported_date.isnot(None)).order_by(Failure.reported_date.asc())
+    res_fail = await db.execute(failures_report_q)
+    failures_rows = res_fail.all()
+    mttf_hours = None
+    def _naive(dt: datetime | None) -> datetime | None:
+        if dt is None:
+            return None
+        return dt if dt.tzinfo is None else dt.astimezone(timezone.utc).replace(tzinfo=None)
+    if len(failures_rows) >= 2:
+        spans = []
+        for i in range(len(failures_rows)-1):
+            rep_i, res_i = failures_rows[i][0], failures_rows[i][1]
+            rep_next, _res_next = failures_rows[i+1][0], failures_rows[i+1][1]
+            rep_i_n = _naive(rep_i)
+            res_i_n = _naive(res_i)
+            rep_next_n = _naive(rep_next)
+            if res_i_n and rep_next_n and res_i_n <= rep_next_n:
+                spans.append((rep_next_n - res_i_n).total_seconds()/3600.0)
+        if spans:
+            mttf_hours = sum(spans)/len(spans)
 
     return KpiSummary(
         total_workorders=int(total or 0),
@@ -126,7 +143,8 @@ async def get_kpi_summary(db: AsyncSession) -> KpiSummary:
         planned_pct=round(planned_pct, 2),
         avg_completion_time_hours=(float(avg_completion_time_hours) if avg_completion_time_hours is not None else None),
         mttr_hours=(float(mttr_hours) if mttr_hours is not None else None),
-        mtbf_hours=(float(mtbf_hours) if mtbf_hours is not None else None),
+    mtbf_hours=(float(mtbf_hours) if mtbf_hours is not None else None),
+    mttf_hours=(float(mttf_hours) if mttf_hours is not None else None),
     )
 
 
@@ -274,3 +292,58 @@ async def get_failures_kpi(db: AsyncSession) -> FailureKpi:
         resolved=int(resolved or 0),
         critical=int(critical or 0),
     )
+
+
+async def get_monthly_response_times(db: AsyncSession, months: int = 6) -> MonthlyResponseSeries:
+    """Media de tiempo de respuesta (started->completed si ambos existen, si no created->completed) agrupado por mes."""
+    now = datetime.now(timezone.utc)
+    start = (now.replace(day=1) - timedelta(days=months*31)).replace(day=1)
+    def _naive(dt: datetime | None) -> datetime | None:
+        if dt is None:
+            return None
+        return dt if dt.tzinfo is None else dt.astimezone(timezone.utc).replace(tzinfo=None)
+    naive_start = _naive(start)
+    # Construir expresión de mes YYYY-MM
+    month_label = func.to_char(func.date_trunc('month', WorkOrder.completed_date), 'YYYY-MM')
+    duration_expr = case(
+        (
+            and_(WorkOrder.started_date.isnot(None), WorkOrder.completed_date.isnot(None)),
+            func.extract('epoch', WorkOrder.completed_date - WorkOrder.started_date)/3600.0
+        ),
+        else_=case(
+            (
+                and_(WorkOrder.created_at.isnot(None), WorkOrder.completed_date.isnot(None)),
+                func.extract('epoch', WorkOrder.completed_date - func.timezone('UTC', WorkOrder.created_at))/3600.0
+            ),
+            else_=None
+        )
+    )
+    q = select(
+        month_label.label('m'),
+        func.avg(duration_expr)
+    ).where(
+        and_(
+            WorkOrder.completed_date.isnot(None),
+            WorkOrder.completed_date >= naive_start,
+        )
+    ).group_by(month_label).order_by(month_label)
+    res = await db.execute(q)
+    rows = res.all()
+    # Crear mapa
+    avg_map = {r[0]: float(r[1]) if r[1] is not None else None for r in rows}
+    # Generar meses continuos hasta actual
+    points: list[MonthlyResponsePoint] = []
+    cursor = start.replace(day=1)
+    end_month = now.replace(day=1)
+    while cursor <= end_month:
+        key = cursor.strftime('%Y-%m')
+        points.append(MonthlyResponsePoint(month=key, avg_response_hours=avg_map.get(key)))
+        # avanzar un mes
+        if cursor.month == 12:
+            cursor = cursor.replace(year=cursor.year+1, month=1)
+        else:
+            cursor = cursor.replace(month=cursor.month+1)
+    # recortar a últimos 'months' + mes actual
+    if len(points) > months+1:
+        points = points[-(months+1):]
+    return MonthlyResponseSeries(points=points)

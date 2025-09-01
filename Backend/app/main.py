@@ -9,7 +9,7 @@ from app.database.postgres import check_connection, create_tables, apply_simple_
 from app.database.data_seed import seed_database
 from app.routers import (
     auth, users, assets,
-    failures, maintenance, maintenance_plan, tasks, workorders, components, department, kpi, inventory, planner
+    failures, maintenance, maintenance_plan, tasks, workorders, components, department, kpi, inventory, planner, calendar
 )
 
 # Configurar logging
@@ -92,6 +92,7 @@ app.include_router(workorders.router, prefix=f"{settings.API_V1_STR}/workorders"
 app.include_router(kpi.router, prefix=f"{settings.API_V1_STR}/kpi")
 app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory")
 app.include_router(planner.router, prefix=f"{settings.API_V1_STR}/planner")
+app.include_router(calendar.router, prefix=f"{settings.API_V1_STR}/calendar")
 
 @app.get("/")
 async def root():

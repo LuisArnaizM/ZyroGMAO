@@ -44,7 +44,7 @@ async def create_tables():
     Crea todas las tablas definidas en los modelos.
     """
     try:
-        from app.models import user, asset, failure, maintenance, task, workorder, department
+        from app.models import user, asset, failure, maintenance, task, workorder, department, calendar
         
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -92,6 +92,28 @@ async def apply_simple_migrations():
                     created_at TIMESTAMPTZ DEFAULT NOW()
                 );
             """))
+            # Calendario laboral
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_working_days (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    weekday INTEGER NOT NULL,
+                    hours DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    CONSTRAINT uq_user_weekday UNIQUE (user_id, weekday)
+                );
+            """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_special_days (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    date DATE NOT NULL,
+                    is_working BOOLEAN NOT NULL DEFAULT FALSE,
+                    hours DOUBLE PRECISION NULL,
+                    reason VARCHAR(120) NULL,
+                    CONSTRAINT uq_user_date UNIQUE (user_id, date)
+                );
+            """))
         logger.info("✅ Migraciones simples aplicadas")
     except Exception as e:
         logger.warning(f"⚠️ Error aplicando migraciones simples: {e}")
@@ -102,7 +124,7 @@ async def drop_tables():
     Elimina todas las tablas de la base de datos.
     """
     try:
-        from app.models import user, asset, failure, maintenance, task, workorder, department
+        from app.models import user, asset, failure, maintenance, task, workorder, department, calendar
         
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)

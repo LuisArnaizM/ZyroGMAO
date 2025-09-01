@@ -6,6 +6,7 @@ from typing import List
 from app.database.postgres import get_db
 from app.auth.dependencies import get_current_user, require_role
 from app.schemas.planner import PlannerWeek, PlannerUserRow, PlannerDay, PlannerTask
+from app.controllers.calendar import compute_capacity_week
 from app.models.user import User
 from app.models.department import Department
 from app.models.task import Task
@@ -89,18 +90,20 @@ async def get_planner_week(
 
     week_users: List[PlannerUserRow] = []
     for u in users:
+        capacity_rows = await compute_capacity_week(db, u.id, start, days)
         day_list: List[PlannerDay] = []
-        for i in range(days):
-            d = start + timedelta(days=i)
+        for (d, cap, is_non, reason) in capacity_rows:
             tlist = tasks_by_user_date.get((u.id, d), [])
             planned = sum(filter(None, [t.estimated_hours or 0 for t in tlist]))
-            free = max(0.0, WORKDAY_HOURS - planned)
+            free = max(0.0, cap - planned)
             day_list.append(PlannerDay(
                 date=d,
-                capacity_hours=WORKDAY_HOURS,
+                capacity_hours=cap,
                 planned_hours=planned,
                 free_hours=free,
-                tasks=[PlannerTask.model_validate(t) for t in tlist]
+                tasks=[PlannerTask.model_validate(t) for t in tlist],
+                is_non_working=is_non,
+                reason=reason
             ))
         week_users.append(PlannerUserRow(user=u, days=day_list))
 

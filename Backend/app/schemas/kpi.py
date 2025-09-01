@@ -12,6 +12,7 @@ class KpiSummary(BaseModel):
     avg_completion_time_hours: Optional[float] = None
     mttr_hours: Optional[float] = None
     mtbf_hours: Optional[float] = None
+    mttf_hours: Optional[float] = None
 
 
 class KpiTrendPoint(BaseModel):
@@ -52,3 +53,10 @@ class FailureKpi(BaseModel):
     in_progress: int
     resolved: int
     critical: int
+
+class MonthlyResponsePoint(BaseModel):
+    month: str  # YYYY-MM
+    avg_response_hours: float | None
+
+class MonthlyResponseSeries(BaseModel):
+    points: list[MonthlyResponsePoint]

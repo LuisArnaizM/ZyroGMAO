@@ -23,6 +23,8 @@ class PlannerDay(BaseModel):
     planned_hours: float
     free_hours: float
     tasks: List[PlannerTask]
+    is_non_working: bool | None = None
+    reason: str | None = None
 
 
 class PlannerUserRow(BaseModel):
