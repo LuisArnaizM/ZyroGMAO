@@ -10,6 +10,7 @@ class UserCreate(BaseModel):
     password: str
     role: str
     department_id: Optional[int] = None
+    hourly_rate: Optional[float] = 50.0
 
 class UserRead(BaseModel):
     id: int
@@ -20,6 +21,7 @@ class UserRead(BaseModel):
     role: str
     is_active: int
     department_id: Optional[int] = None
+    hourly_rate: Optional[float] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     
@@ -38,6 +40,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[int] = None
     department_id: Optional[int] = None
+    hourly_rate: Optional[float] = None
 
 class UserLogin(BaseModel):
     login: str
@@ -67,6 +70,7 @@ class UserProfile(BaseModel):
     role: str
     is_active: int
     department_id: Optional[int] = None
+    hourly_rate: Optional[float] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     full_name: str
@@ -85,6 +89,7 @@ class UserProfile(BaseModel):
             role=user.role,
             is_active=user.is_active,
             department_id=getattr(user, 'department_id', None),
+            hourly_rate=getattr(user, 'hourly_rate', None),
             created_at=user.created_at,
             updated_at=user.updated_at,
             full_name=f"{user.first_name} {user.last_name}",

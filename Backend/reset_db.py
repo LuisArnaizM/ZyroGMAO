@@ -22,12 +22,17 @@ async def force_clean_database():
     Limpia completamente la base de datos eliminando y recreando el esquema.
     """
     try:
-        # Construir URL para asyncpg; si el host es "db" (docker) usar localhost cuando se ejecuta local
+        # Construir URL para asyncpg
         host = settings.POSTGRES_SERVER or "localhost"
-        if host == "db":
+        # Si estamos en Docker, usar el host "db", si no, usar localhost
+        if os.getenv("DOCKER_ENV") == "true" or os.path.exists("/.dockerenv"):
+            host = "db"
+        elif host == "db":
             host = "localhost"
+            
         database_url = f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{host}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
         
+        print(f"🔗 Conectando a: {host}:{settings.POSTGRES_PORT}")
         # Conectar directamente a PostgreSQL
         conn = await asyncpg.connect(database_url)
         

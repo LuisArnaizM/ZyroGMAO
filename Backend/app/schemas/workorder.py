@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 from .user import UserReference
+from app.schemas.maintenance import MaintenanceRead
 
 class WorkOrderCreate(BaseModel):
     title: str
@@ -16,6 +17,7 @@ class WorkOrderCreate(BaseModel):
     assigned_to: Optional[int] = None
     failure_id: Optional[int] = None
     department_id: Optional[int] = None
+    plan_id: Optional[int] = None
 
 class WorkOrderRead(BaseModel):
     id: int
@@ -36,6 +38,7 @@ class WorkOrderRead(BaseModel):
     created_by: int
     failure_id: Optional[int] = None
     department_id: Optional[int] = None
+    plan_id: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     
@@ -65,3 +68,16 @@ class WorkOrderUpdate(BaseModel):
     assigned_to: Optional[int] = None
     failure_id: Optional[int] = None
     department_id: Optional[int] = None
+    plan_id: Optional[int] = None
+
+
+class WorkOrderCompleteRequest(BaseModel):
+    """Solo notas opcionales para el maintenance generado automáticamente"""
+    maintenance_notes: Optional[str] = None
+
+class WorkOrderCompleteResult(BaseModel):
+    workorder: WorkOrderRead
+    maintenance: Optional[MaintenanceRead] = None
+
+    class Config:
+        from_attributes = True

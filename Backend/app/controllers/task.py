@@ -9,6 +9,19 @@ from app.models.inventory import InventoryItem, TaskUsedComponent
 from app.models.enums import TaskStatus
 from datetime import datetime, timezone
 
+
+def _naive_utc(dt: datetime | None) -> datetime | None:
+    """Convierte cualquier datetime a naive UTC (sin tzinfo) para columnas TIMESTAMP WITHOUT TIME ZONE.
+
+    - Si viene con tz -> se convierte a UTC y se quita tzinfo
+    - Si viene naive -> se asume ya en UTC y se deja igual
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
 async def create_task(db: AsyncSession, task_in: TaskCreate, created_by_id: int):
     """Create a new task"""
     
@@ -29,8 +42,43 @@ async def create_task(db: AsyncSession, task_in: TaskCreate, created_by_id: int)
             raise ValueError(f"WorkOrder with ID {task_in.workorder_id} does not exist")
     
     task_data = task_in.model_dump()
+    # Normalizar due_date (columna sin timezone) para evitar mezcla aware/naive
+    if task_data.get("due_date") is not None:
+        task_data["due_date"] = _naive_utc(task_data["due_date"])
     task_data['created_by_id'] = created_by_id
     
+    # Si assigned_to y el creador es supervisor, validar jerarquía
+    if task_data.get("assigned_to"):
+        # Cargar creador
+        from app.models.user import User
+        from app.models.department import Department
+        creator_res = await db.execute(select(User).where(User.id == created_by_id))
+        creator = creator_res.scalar_one_or_none()
+        if creator and creator.role == "Supervisor":
+            # Obtener deps que gestiona
+            dep_res = await db.execute(select(Department).where(Department.manager_id == created_by_id))
+            managed = dep_res.scalars().all()
+            if managed:
+                # construir set de departamentos bajo su gestión
+                all_deps_res = await db.execute(select(Department))
+                all_deps = all_deps_res.scalars().all()
+                by_parent = {}
+                for d in all_deps:
+                    by_parent.setdefault(d.parent_id, []).append(d)
+                target = set()
+                stack = [d.id for d in managed]
+                while stack:
+                    cur = stack.pop()
+                    if cur in target:
+                        continue
+                    target.add(cur)
+                    for ch in by_parent.get(cur, []):
+                        stack.append(ch.id)
+                # Usuario asignado
+                assigned_res = await db.execute(select(User).where(User.id == task_data["assigned_to"]))
+                assigned_user = assigned_res.scalar_one_or_none()
+                if not assigned_user or assigned_user.department_id not in target:
+                    raise ValueError("Supervisor cannot assign task to user outside managed departments")
     new_task = Task(**task_data)
     db.add(new_task)
     await db.commit()
@@ -95,6 +143,9 @@ async def update_task(db: AsyncSession, task_id: int, task_in: TaskUpdate):
         return None
     
     update_data = task_in.model_dump(exclude_unset=True)
+    # Normalizar due_date si viene en update
+    if "due_date" in update_data:
+        update_data["due_date"] = _naive_utc(update_data["due_date"])
     # Procesar componentes usados si se completa la tarea
     used = update_data.pop("used_components", None)
     for key, value in update_data.items():

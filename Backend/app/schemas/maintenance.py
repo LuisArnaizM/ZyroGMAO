@@ -10,7 +10,13 @@ class MaintenanceCreate(BaseModel):
     user_id: int
     maintenance_type: MaintenanceType = MaintenanceType.PREVENTIVE
     scheduled_date: Optional[datetime] = None
+    completed_date: Optional[datetime] = None
+    duration_hours: Optional[float] = None
+    cost: Optional[float] = None
+    notes: Optional[str] = None
     workorder_id: Optional[int] = None
+    component_id: Optional[int] = None
+    plan_id: Optional[int] = None
 
 class MaintenanceRead(BaseModel):
     id: int

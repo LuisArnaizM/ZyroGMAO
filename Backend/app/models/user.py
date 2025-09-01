@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from enum import Enum
@@ -19,6 +19,7 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False)
+    hourly_rate = Column(Float, nullable=True, default=50.0)  # Tarifa por hora del técnico
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

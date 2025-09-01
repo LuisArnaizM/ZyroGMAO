@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
 from app.database.postgres import get_db
-from app.schemas.workorder import WorkOrderCreate, WorkOrderRead, WorkOrderUpdate
+from app.schemas.workorder import WorkOrderCreate, WorkOrderRead, WorkOrderUpdate, WorkOrderCompleteRequest, WorkOrderCompleteResult
 from app.controllers.workorder import (
     create_workorder,
     get_workorder,
@@ -82,14 +82,40 @@ async def update_existing_workorder(
     db: AsyncSession = Depends(get_db),
     user = Depends(require_role(["Admin", "Supervisor", "Tecnico"]))
 ):
+    # Convert WorkOrderUpdate to dict, excluding None values
+    update_data = {k: v for k, v in workorder_in.dict(exclude_unset=True).items() if v is not None}
+    
     workorder = await update_workorder(
         db=db,
         workorder_id=workorder_id,
-        workorder_in=workorder_in,
+        update_data=update_data,
     )
     if not workorder:
         raise HTTPException(status_code=404, detail="Work order not found")
     return workorder
+
+@router.post("/{workorder_id}/complete", response_model=WorkOrderCompleteResult)
+async def complete_workorder(
+    workorder_id: int,
+    complete_data: WorkOrderCompleteRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    user = Depends(require_role(["Admin", "Supervisor"]))
+):
+    """Completa una workorder (status -> COMPLETED) y dispara creación automática de maintenance."""
+    try:
+        created_container = {}
+        workorder = await update_workorder(
+            db=db,
+            workorder_id=workorder_id,
+            update_data={"status": "COMPLETED"},
+            maintenance_notes=complete_data.maintenance_notes if complete_data else None,
+            _created_maintenance=created_container,
+        )
+        if not workorder:
+            raise HTTPException(status_code=404, detail="Work order not found")
+        return {"workorder": workorder, "maintenance": created_container.get('maintenance')}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{workorder_id}", response_model=dict)
 async def delete_existing_workorder(

@@ -1,8 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
+from fastapi import HTTPException
 from app.models.workorder import WorkOrder
 from app.models.asset import Asset
 from app.models.failure import Failure
+from app.models.enums import WorkOrderStatus
 from app.schemas.workorder import WorkOrderCreate, WorkOrderRead, WorkOrderUpdate
 from datetime import datetime, timezone
 from app.models.user import User
@@ -109,81 +113,118 @@ async def get_workorders_by_user(db: AsyncSession, user_id: int):
     )
     return result.scalars().all()
 
-async def update_workorder(db: AsyncSession, workorder_id: int, workorder_in: WorkOrderUpdate):
-    """Update a work order by ID"""
-    result = await db.execute(
-        select(WorkOrder).where(WorkOrder.id == workorder_id)
-    )
-    workorder = result.scalar_one_or_none()
-    
-    if workorder is None:
-        return None
-    
-    update_data = workorder_in.model_dump(exclude_unset=True)
+async def update_workorder(db: AsyncSession, workorder_id: int, update_data: dict, maintenance_notes: str | None = None, _created_maintenance: dict | None = None) -> WorkOrder:
+    """Actualiza una orden de trabajo y crea automáticamente un maintenance al completarse.
+    - Calcula horas y coste reales al pasar a COMPLETED.
+    - Si el estado cambia a COMPLETED (y antes no lo estaba) crea registro Maintenance (si no existe) usando datos de la WO.
+    - Puede añadir notas al maintenance (maintenance_notes).
+    """
+    workorder = await get_workorder(db, workorder_id)
+    if not workorder:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
 
-    def to_naive_utc(dt: datetime | None) -> datetime | None:
-        if dt is None:
-            return None
-        if dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None:
-            return dt.astimezone(timezone.utc).replace(tzinfo=None)
-        return dt
-    
-    # Lógica para fechas automáticas
-    if update_data.get('status') == 'in_progress' and not workorder.started_date:
-        update_data['started_date'] = datetime.now(timezone.utc)
-    elif update_data.get('status') == 'completed' and not workorder.completed_date:
-        update_data['completed_date'] = datetime.now(timezone.utc)
+    old_status = workorder.status
 
-    # Normalize possible provided datetime fields
-    if 'scheduled_date' in update_data:
-        update_data['scheduled_date'] = to_naive_utc(update_data['scheduled_date'])
-    if 'started_date' in update_data and isinstance(update_data['started_date'], datetime):
-        update_data['started_date'] = to_naive_utc(update_data['started_date'])
-    if 'completed_date' in update_data and isinstance(update_data['completed_date'], datetime):
-        update_data['completed_date'] = to_naive_utc(update_data['completed_date'])
-    
-    # Validación de asignación por departamento: si se establece assigned_to, comprobar que el usuario pertenece al mismo departamento (o subárbol) de workorder.department_id si existe
-    if 'assigned_to' in update_data and update_data['assigned_to'] is not None:
-        # Determinar el department objetivo
-        target_dep_id = update_data.get('department_id', workorder.department_id)
-        if target_dep_id is not None:
-            # construir subárbol
-            deps_result = await db.execute(select(Department))
-            deps = deps_result.scalars().all()
-            by_parent = {}
-            for d in deps:
-                by_parent.setdefault(d.parent_id, []).append(d.id)
-            to_visit = [target_dep_id]
-            subtree = set()
-            while to_visit:
-                cur = to_visit.pop()
-                subtree.add(cur)
-                to_visit.extend(by_parent.get(cur, []))
-            # obtener usuario asignado
-            user_q = await db.execute(select(User).where(User.id == update_data['assigned_to']))
-            assigned_user = user_q.scalar_one_or_none()
-            if not assigned_user:
-                raise ValueError("Assigned user does not exist")
+    # Si el estado cambia a COMPLETED, calcular automáticamente los valores reales
+    if update_data.get("status") == WorkOrderStatus.COMPLETED.value and old_status != WorkOrderStatus.COMPLETED.value:
+        print(f"DEBUG: Calculando valores automáticos para workorder {workorder_id}")
 
-            # Además de comprobar department_id, permitir asignar si el usuario es manager
-            # de algún departamento dentro del subárbol (department.manager_id) o si tiene
-            # rol de Admin/Supervisor.
-            manager_ids = set(d.manager_id for d in deps if d.id in subtree and d.manager_id is not None)
-            user_role = getattr(assigned_user, 'role', None)
-            if not (
-                (assigned_user.department_id in subtree) or
-                (assigned_user.id in manager_ids) or
-                (user_role in ("Admin", "Supervisor"))
-            ):
-                raise ValueError("Assigned user does not belong to target department subtree or have sufficient role")
+        from sqlalchemy.orm import joinedload
+        from sqlalchemy import select
+        from app.models.task import Task
+        from app.models.inventory import TaskUsedComponent, InventoryItem
 
+        tasks_query = select(Task).options(
+            joinedload(Task.assignee),
+            joinedload(Task.used_components).joinedload(TaskUsedComponent.component)
+        ).where(Task.workorder_id == workorder_id)
+
+        result = await db.execute(tasks_query)
+        tasks = result.scalars().unique().all()
+
+        total_hours = 0.0
+        total_cost = 0.0
+
+        for task in tasks:
+            if task.actual_hours:
+                total_hours += task.actual_hours
+                if task.assignee and task.assignee.hourly_rate:
+                    labor_cost = task.actual_hours * task.assignee.hourly_rate
+                else:
+                    labor_cost = task.actual_hours * 50.0  # default rate
+                total_cost += labor_cost
+                print(f"DEBUG: Task {task.id} labor cost agregado = {labor_cost}")
+
+            for used_component in task.used_components:
+                if used_component.unit_cost_snapshot and used_component.quantity:
+                    component_cost = used_component.unit_cost_snapshot * used_component.quantity
+                elif used_component.component and used_component.component.inventory_item and used_component.quantity and used_component.component.inventory_item.unit_cost:
+                    component_cost = used_component.component.inventory_item.unit_cost * used_component.quantity
+                else:
+                    component_cost = 0
+                total_cost += component_cost
+                if component_cost:
+                    print(f"DEBUG: Task {task.id} component cost agregado = {component_cost}")
+
+        update_data["actual_hours"] = total_hours
+        update_data["actual_cost"] = total_cost
+        update_data["completed_date"] = datetime.now(timezone.utc).replace(tzinfo=None)
+        print(f"DEBUG: Totales calculados - Horas: {total_hours}, Costo: {total_cost}")
+
+    # Aplicar updates
     for key, value in update_data.items():
         setattr(workorder, key, value)
-    
-    workorder.updated_at = datetime.now(timezone.utc)
-    
-    await db.commit()
-    await db.refresh(workorder)
+
+    try:
+        await db.commit()
+        await db.refresh(workorder)
+    except Exception as e:
+        await db.rollback()
+        print(f"ERROR: Fallo al actualizar workorder: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al actualizar la orden de trabajo: {str(e)}")
+
+    # Auto-create maintenance si recién se completó
+    if workorder.status == WorkOrderStatus.COMPLETED.value and old_status != WorkOrderStatus.COMPLETED.value:
+        try:
+            from sqlalchemy import select as _select
+            from app.models.maintenance import Maintenance as _MaintenanceModel
+            existing = await db.execute(
+                _select(_MaintenanceModel.id).where(_MaintenanceModel.workorder_id == workorder.id).limit(1)
+            )
+            if existing.scalar() is None:
+                print(f"DEBUG: Creando maintenance para WO {workorder.id}")
+                from app.controllers.maintenance import create_maintenance
+                from app.schemas.maintenance import MaintenanceCreate
+                from app.models.enums import MaintenanceType
+
+                mtype_map = {
+                    'MAINTENANCE': MaintenanceType.PREVENTIVE,
+                    'REPAIR': MaintenanceType.CORRECTIVE,
+                    'INSPECTION': MaintenanceType.PREVENTIVE,
+                }
+                m_type = mtype_map.get((workorder.work_type or '').upper(), MaintenanceType.PREVENTIVE)
+                maintenance_in = MaintenanceCreate(
+                    description=workorder.title or f"WorkOrder {workorder.id}",
+                    asset_id=workorder.asset_id,
+                    user_id=workorder.assigned_to or workorder.created_by,
+                    maintenance_type=m_type,
+                    scheduled_date=workorder.scheduled_date,
+                    completed_date=workorder.completed_date,
+                    duration_hours=workorder.actual_hours,
+                    cost=workorder.actual_cost,
+                    notes=maintenance_notes,
+                    workorder_id=workorder.id,
+                    plan_id=getattr(workorder, 'plan_id', None)
+                )
+                maint = await create_maintenance(db=db, maintenance_in=maintenance_in)
+                if _created_maintenance is not None:
+                    _created_maintenance['maintenance'] = maint
+                print(f"DEBUG: Maintenance creado para WO {workorder.id}")
+            else:
+                print(f"DEBUG: Ya existía maintenance para WO {workorder.id}, no se crea otro")
+        except Exception as me:
+            print(f"WARNING: Fallo creando maintenance automático para WO {workorder.id}: {me}")
+
     return workorder
 
 async def delete_workorder(db: AsyncSession, workorder_id: int):

@@ -9,24 +9,44 @@ from app.schemas.maintenance_plan import (
 from datetime import datetime, timezone
 
 
+def _naive_utc(dt: datetime | None) -> datetime | None:
+    """Convierte cualquier datetime a naive UTC (sin tzinfo) para columnas TIMESTAMP WITHOUT TIME ZONE.
+    - Si viene None -> None
+    - Si viene con tz -> se convierte a UTC y se quita tzinfo
+    - Si viene naive -> se asume ya en UTC y se deja igual
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
 async def create_maintenance_plan(db: AsyncSession, plan_in: MaintenancePlanCreate):
+    # Normalizar fechas para evitar mezcla aware/naive (start/next/last son columnas sin timezone)
+    start_date = _naive_utc(plan_in.start_date) or datetime.utcnow()
+    next_due_date = _naive_utc(plan_in.next_due_date)
+    last_exec = _naive_utc(plan_in.last_execution_date)
+
+    now_aware = datetime.now(timezone.utc)  # created_at / updated_at (columnas con timezone=True)
+
     new_plan = MaintenancePlan(
         name=plan_in.name,
         description=plan_in.description,
-        plan_type=plan_in.plan_type,
+        plan_type=plan_in.plan_type.value if plan_in.plan_type else None,
         frequency_days=plan_in.frequency_days,
         frequency_weeks=plan_in.frequency_weeks,
         frequency_months=plan_in.frequency_months,
         estimated_duration=plan_in.estimated_duration,
         estimated_cost=plan_in.estimated_cost,
-    start_date=plan_in.start_date or datetime.now(timezone.utc),
-        next_due_date=plan_in.next_due_date,
-        last_execution_date=plan_in.last_execution_date,
+        start_date=start_date,
+        next_due_date=next_due_date,
+        last_execution_date=last_exec,
         active=plan_in.active,
         asset_id=plan_in.asset_id,
         component_id=plan_in.component_id,
-    created_at=datetime.now(timezone.utc),
-    updated_at=datetime.now(timezone.utc),
+        created_at=now_aware,
+        updated_at=now_aware,
     )
     db.add(new_plan)
     await db.commit()
@@ -62,7 +82,13 @@ async def update_maintenance_plan(db: AsyncSession, plan_id: int, plan_in: Maint
         return None
     update_data = plan_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
-        setattr(plan, key, value)
+        if key == 'plan_type' and value is not None:
+            # Convert enum to string value
+            setattr(plan, key, value.value if hasattr(value, 'value') else value)
+        elif key in {"start_date", "next_due_date", "last_execution_date"}:
+            setattr(plan, key, _naive_utc(value))
+        else:
+            setattr(plan, key, value)
     plan.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(plan)

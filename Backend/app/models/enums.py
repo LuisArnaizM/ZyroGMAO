@@ -31,6 +31,7 @@ class MaintenanceType(enum.Enum):
 class PlanType(enum.Enum):
     PREVENTIVE = "PREVENTIVE"
     PREDICTIVE = "PREDICTIVE"
+    INSPECTION = "INSPECTION"
 
 
 class WorkOrderStatus(enum.Enum):

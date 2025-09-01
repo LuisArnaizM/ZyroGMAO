@@ -6,16 +6,32 @@ from datetime import datetime, timezone
 
 async def create_maintenance(db: AsyncSession, maintenance_in: MaintenanceCreate):
     """Create a new maintenance record"""
+    def _to_naive_utc(dt: datetime | None) -> datetime | None:
+        if dt is None:
+            return None
+        if dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None:
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+
+    m_type = maintenance_in.maintenance_type.value if hasattr(maintenance_in.maintenance_type, 'value') else maintenance_in.maintenance_type
+    scheduled_dt = _to_naive_utc(maintenance_in.scheduled_date)
+    completed_dt = _to_naive_utc(maintenance_in.completed_date if hasattr(maintenance_in, 'completed_date') else None)
     new_maintenance = Maintenance(
         asset_id=maintenance_in.asset_id,
         user_id=maintenance_in.user_id,
         description=maintenance_in.description,
-        maintenance_type=maintenance_in.maintenance_type,
-        scheduled_date=maintenance_in.scheduled_date,
-        workorder_id=maintenance_in.workorder_id,
-        status="scheduled",
-    created_at=datetime.now(timezone.utc),
-    updated_at=datetime.now(timezone.utc)
+        maintenance_type=m_type,
+    scheduled_date=scheduled_dt,
+    completed_date=completed_dt,
+    duration_hours=maintenance_in.duration_hours,
+    cost=maintenance_in.cost,
+    notes=maintenance_in.notes,
+    workorder_id=maintenance_in.workorder_id,
+    component_id=maintenance_in.component_id,
+    plan_id=maintenance_in.plan_id,
+        status="SCHEDULED",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
     db.add(new_maintenance)
     await db.commit()

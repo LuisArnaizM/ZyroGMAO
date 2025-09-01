@@ -265,6 +265,7 @@ async def _ensure_users(session: AsyncSession, departments: list[Department]) ->
             role="Admin",
             is_active=True,
             department_id=departments[0].id,
+            hourly_rate=80.0,  # Admin rate: $80/hour
         )
         roles["Admin"].append(admin)
         session.add(admin)
@@ -289,6 +290,7 @@ async def _ensure_users(session: AsyncSession, departments: list[Department]) ->
             role="Supervisor",
             is_active=True,
             department_id=random.choice(departments).id,
+            hourly_rate=60.0,  # Supervisor rate: $60/hour
         )
         roles["Supervisor"].append(u)
         session.add(u)
@@ -312,6 +314,7 @@ async def _ensure_users(session: AsyncSession, departments: list[Department]) ->
             role="Tecnico",
             is_active=True,
             department_id=random.choice(departments).id,
+            hourly_rate=45.0,  # Technician rate: $45/hour
         )
         roles["Tecnico"].append(u)
         session.add(u)
@@ -335,6 +338,7 @@ async def _ensure_users(session: AsyncSession, departments: list[Department]) ->
             role="Consultor",
             is_active=True,
             department_id=random.choice(departments).id,
+            hourly_rate=70.0,  # Consultant rate: $70/hour
         )
         roles["Consultor"].append(u)
         session.add(u)

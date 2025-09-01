@@ -128,7 +128,6 @@ async def get_failures_with_workorder_ids(db: AsyncSession):
             "component_id": failure.component_id,
             "created_at": failure.created_at,
             "updated_at": failure.updated_at,
-            # Tomar solo el workorder más reciente o None
             "workorder_id": most_recent_wo.id if most_recent_wo else None
         }
         failures_with_wo.append(failure_dict)
