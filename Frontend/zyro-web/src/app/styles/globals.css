@@ -1,0 +1,514 @@
+/* Habilitar Tailwind v4 y definir paleta neutra */
+@import "tailwindcss";
+
+/* Paleta neutra y elegante */
+:root {
+  --background: #fafbfc; /* Más claro y grisáceo para armonizar */
+  --foreground: var(--secondary); /* slate-800 */
+  --muted: #6b7280;      /* gray-500 */
+  --muted-2: #9ca3af;    /* gray-400 */
+  --border: var(--secondary);
+  --border-light: var(--secondary-50);
+
+  /* Acentos suaves */
+  --primary: #f59856;
+  --primary-dark: #ea6016;
+  --primary-light: #fce7ae;
+  --primary-light-100: #f5cf5c;
+  --secondary: #1e293b;
+  --secondary-50: #f3f4f6;
+  --secondary-100: #f9f9f9;
+  --primary-100: #030303;
+  --primary-gradient: linear-gradient(to right, var(--primary-light-100), var(--primary-light));
+  --secondary-gradient: linear-gradient(to right, rgb(99 102 241 / 0.1), rgb(168 85 247 / 0.1));
+  --primary-gradient-light: linear-gradient(to right, rgba(239,201,74,0.12), rgba(252,209,174,0.08));
+  
+  /* Gradiente header sutil y elegante */
+  --header-start: #ffffff;
+  --header-end: #f8fafc; /* slate-50 */
+  --header-gradient: linear-gradient(to left,var(--secondary), var(--secondary-50) 10%);
+  --primary-gradient-dark: linear-gradient(to right, var(--primary-dark), var(--primary));
+  
+  --card-background: rgba(255, 255, 255, 0.85);
+  --card-border: rgba(226, 232, 240, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b0e12;
+    --foreground: #e5e7eb; /* gray-200 */
+    --muted: #9ca3af;
+    --muted-2: #6b7280;
+    --border: rgba(255, 255, 255, 0.08);
+
+    --primary: #f89147; /* indigo-400 */
+    --primary-dark: #ea580c;
+    --primary-light: #f0bf97;
+    --primary-light-100: #f5cf5c;
+    --primary-gradient: linear-gradient(to right, var(--primary-light), var(--primary-dark));
+    --secondary-gradient: linear-gradient(to right, rgb(129 140 248 / 0.1), rgb(196 181 253 / 0.1));
+    --primary-gradient-light: linear-gradient(to right, rgba(252,209,174,0.14), rgba(248,155,80,0.10));
+
+    /* Gradiente header elegante para modo oscuro */
+    --header-start: #0b0e12;
+    --header-end: #111827; /* gray-900 */
+    --header-gradient: linear-gradient(to right,var(--secondary), var(--secondary-50) 60%);
+    --primary-gradient-dark: linear-gradient(to right, rgba(248,155,80,0.18), rgba(234,88,12,0.14));
+
+    /* Cards para modo oscuro */
+    --card-background: rgba(30, 41, 59, 0.8);
+    --card-border: rgba(51, 65, 85, 0.6);
+  }
+}
+
+/* Base */
+html, body { height: 100%; }
+body {
+  background-color: var(--background);
+  color: var(--secondary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Utilidades */
+.header-gradient {
+  background: var(--header-gradient);
+}
+.primary-gradient {
+  background: var(--primary-gradient);
+}
+.secondary-gradient {
+  background: var(--secondary-gradient);
+}
+.primary-gradient-light {
+  background: var(--primary-gradient-light);
+}
+.primary-gradient-dark {
+  background: var(--primary-gradient-dark);
+}
+.lborder { border: 1px solid var(--border); }
+.hborder { border-bottom: 1px solid var(--border); }
+.sborder { border-right: 1px solid var(--border); }
+
+.lborder-light { border: 1px solid var(--border-light); }
+/* Cards elegantes que armonizan con header-gradient */
+.elegant-card {
+  background: var(--card-background);
+  border: 1px solid var(--border-light);
+  backdrop-filter: blur(8px);
+  border-radius: 1rem;
+  transition: all 0.3sº cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+@media (prefers-color-scheme: dark) {
+  .elegant-card:hover {
+    background: rgba(30, 41, 59, 0.9);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Estilos para título superpuesto a la altura de botones */
+.title-card {
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(79, 70, 229, 0.15);
+  max-width: fit-content;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.title-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 40px rgba(79, 70, 229, 0.2);
+}
+
+
+.elegant-table .ant-table-thead > tr > th {
+  background: var(--primary-light-100);
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  font-weight: bold;
+  font-size: 0.875rem;
+  padding: 12px 16px;
+}
+
+.elegant-table .ant-table-tbody > tr.selectable-row:hover {
+  border-left: 1px solid var(--border-light);
+  transform: translateY(-3px);
+}
+
+
+.elegant-table .ant-table-tbody > tr.selected-row {
+  background: var(--primary-light-100);
+}
+
+
+
+/* Paginación elegante */
+
+.elegant-table .ant-pagination .ant-pagination-item {
+  background: var(--primary-gradient-light);
+  color: var(--secondary);
+  border: 1px solid var(--border-light);
+}
+
+.elegant-table .ant-pagination .ant-pagination-item:hover {
+  border-color: var(--secondary);
+  background: var(--primary-gradient);
+}
+
+.elegant-table .ant-pagination .ant-pagination-item-active {
+  border-color: var(--border);
+  background: var(--primary-gradient-dark);
+  color: var(--secondary);
+}
+.elegant-table .ant-table-tbody > tr.ant-table-row:hover > td {
+  background: var(--primary-light);
+}
+
+/* Planner table headers */
+.planner-table.elegant-table thead th.planner-th {
+  background: var(--primary-light-100);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  transition: background .2s ease;
+}
+.planner-table.elegant-table thead th.planner-th-today {
+  background: linear-gradient(90deg, var(--primary-light) 0%, var(--primary-light-100) 100%);
+  box-shadow: inset 0 -2px 0 0 var(--primary);
+}
+.planner-table .planner-user-cell {
+  font-weight: 600;
+  background: var(--primary-light-100);
+}
+
+
+/* Botones globales reutilizables */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+/* Variantes */
+.btn--primary {
+  background: var(--primary-gradient);
+  color: var(--foreground);
+  border-color: transparent;
+}
+.btn--primary:hover { background: var(--primary-gradient-dark); transform: translateY(-1px); box-shadow: 0 8px 20px rgba(234,88,12,0.08); }
+
+.btn--secondary {
+  color: var(--foreground);
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(226,232,240,0.7);
+}
+.btn--secondary:hover { background: rgba(255,255,255,0.85); }
+
+.btn--danger {
+  color: var(--foreground);
+  background: linear-gradient(to right, #f43f5e, #ef4444);
+  border-color: transparent;
+  box-shadow: 0 2px 6px rgba(239,68,68,0.08);
+}
+.btn--danger:hover { transform: translateY(-1px); }
+
+.btn--ghost {
+  color: var(--secondary);
+  background: transparent;
+  border: 1px solid rgba(148,163,184,0.6);
+}
+.btn--ghost:hover { background: rgba(148,163,184,0.06); }
+
+.btn--link {
+  background: transparent;
+  padding: 0;
+}
+.btn--link .p {
+  color: var(--secondary);
+}
+.btn--link:hover { 
+  color: var(--primary-dark);
+}
+
+/* Tamaños */
+.btn--sm { font-size: 0.75rem; padding: 0.375rem 0.75rem; }
+.btn--md { font-size: 0.875rem; padding: 0.5rem 1rem; }
+.btn--lg { font-size: 1rem; padding: 0.625rem 1.25rem; }
+
+.btn--block { width: 100%; justify-content: center; }
+
+@media (prefers-color-scheme: dark) {
+  .btn--secondary { background: rgba(30,41,59,0.5); border-color: rgba(51,65,85,0.6); color: var(--foreground); }
+  .btn--ghost:hover { background: rgba(255,255,255,0.03); }
+  .btn--primary:hover { box-shadow: 0 8px 20px rgba(248,155,80,0.06); }
+}
+
+.link-hover {
+  border-color: var(--border-light);
+  transition: background 250ms ease, border-color 250ms ease, transform 250ms ease, box-shadow 250ms ease;
+}
+.link-hover:hover {
+  background: var(--primary-gradient);
+  border-color: var(--secondary);
+  transform: translateX(4px) scale(1.03);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.04);
+}
+
+/* Notificaciones (campana) */
+.notification-bell-wrapper {
+  position: relative;
+}
+.notification-bell-btn {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-gradient);
+  border: 1px solid var(--border-light);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+  color: var(--secondary);
+  transition: all .25s ease;
+  backdrop-filter: blur(6px);
+}
+.notification-bell-btn:hover { background: var(--primary-gradient-dark); transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.10); }
+.notification-bell-active { animation: pingGlow 2.4s ease-in-out infinite; }
+@keyframes pingGlow {
+  0%,100% { box-shadow: 0 0 0 0 rgba(245,152,86,0.45); }
+  50% { box-shadow: 0 0 0 8px rgba(245,152,86,0); }
+}
+
+/* Badge custom (sobre-estructura antd) */
+.notification-bell-wrapper .ant-badge-count {
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Modal de notificaciones */
+.notifications-modal .ant-modal-content {
+  background: var(--card-background);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(10px);
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 40px -12px rgba(0,0,0,0.25);
+}
+.notifications-modal .ant-modal-header {
+  background: var(--primary-gradient-light);
+  border-bottom: 1px solid var(--border-light);
+  border-radius: 1.25rem 1.25rem 0 0;
+  padding: 12px 20px;
+}
+.notifications-modal .ant-modal-title { font-weight: 600; letter-spacing: .25px; }
+.notifications-modal .ant-modal-body { padding-top: 1.25rem; }
+
+/* Tarjetas de plan dentro del modal */
+.plan-card {
+  background: var(--card-background);
+  border: 1px solid var(--card-border);
+  border-radius: 0.85rem;
+  padding: .85rem .9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .25s ease, transform .25s ease, box-shadow .25s ease;
+}
+.plan-card::after {
+  content:"";
+  position:absolute; inset:0; pointer-events:none; opacity:.05;
+  background: radial-gradient(circle at 70% 15%, var(--primary-light-100), transparent 70%);
+}
+.plan-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px -8px rgba(0,0,0,0.25); }
+.plan-card.urgent { border-color: #f59e0b; }
+.plan-card.overdue { border-color: #dc2626; }
+.plan-card.safe { border-color: var(--card-border); }
+.plan-card .plan-tag { font-size: .625rem; letter-spacing: .5px; padding: 2px 6px; border-radius: 6px; font-weight:600; background: var(--primary-gradient-light); }
+.plan-meta { font-size: .65rem; display:flex; justify-content:space-between; color: var(--muted); }
+.plan-meta span:last-child { color: var(--secondary); font-weight:500; }
+.plan-status { font-size:.65rem; font-weight:600; }
+.plan-status.overdue { color:#dc2626; }
+.plan-status.urgent { color:#d97706; }
+.plan-status.safe { color:#059669; }
+.plan-actions { margin-top:.25rem; }
+.plan-actions .btn { width:100%; justify-content:center; }
+
+/* ================= Planner (Semana) ================= */
+.planner-wrapper { display: flex; flex-direction: column; gap: 1rem; }
+.planner-scroll { position: relative; border:1px solid var(--border-light); border-radius: .75rem; overflow: auto; max-height: 60vh; background: var(--card-background); }
+.planner-table { width: max-content; min-width: 100%; font-size: .75rem; }
+.planner-table thead th { position: sticky; top:0; z-index:90; background: var(--secondary-50); backdrop-filter: blur(4px); font-weight:600; font-size:.7rem; letter-spacing:.5px; text-transform:uppercase; }
+@media (prefers-color-scheme: dark) { .planner-table thead th { background: rgba(30,41,59,0.85); } }
+.planner-table thead th, .planner-table tbody td { border:1px solid var(--border-light); }
+.planner-table tbody td { background: rgba(255,255,255,0.4); }
+@media (prefers-color-scheme: dark) { .planner-table tbody td { background: rgba(30,41,59,0.4); } }
+.planner-table .planner-user-cell { position: sticky; left:0; z-index:70; background: var(--secondary-50); font-weight:500; min-width: 160px; border-left: 4px solid var(--border-light); }
+@media (prefers-color-scheme: dark) { .planner-table .planner-user-cell { background: rgba(30,41,59,0.85); } }
+.planner-day-cell { width: 190px; min-width:190px; }
+.planner-day-block { height: 80px; border:1px solid var(--border-light); border-radius:.5rem; background: var(--secondary-50); position:relative; overflow:hidden; display:flex; }
+@media (prefers-color-scheme: dark) { .planner-day-block { background: rgba(30,41,59,0.6); } }
+.planner-task-bar { height:100%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:500; color:#fff; white-space:nowrap; overflow:hidden; padding:0 2px; transition: opacity .15s ease; }
+.planner-free-bar { height:100%; background: repeating-linear-gradient(135deg, #d1d5db 0 6px, #e5e7eb 6px 12px); font-size:10px; display:flex; align-items:center; justify-content:center; color:#374151; }
+@media (prefers-color-scheme: dark) { .planner-free-bar { background: repeating-linear-gradient(135deg, #334155 0 6px, #1f2937 6px 12px); color:#cbd5e1; } }
+.planner-day-meta { text-align:center; margin-top:4px; font-size:10px; color: var(--muted); }
+.planner-add-btn { position:absolute; top:2px; right:2px; background: var(--card-background); color: var(--foreground); border:1px solid var(--border-light); border-radius:4px; font-size:10px; padding:2px 4px; line-height:1; cursor:pointer; display:flex; align-items:center; gap:2px; }
+@media (prefers-color-scheme: dark) { .planner-add-btn { background:rgba(30,41,59,0.85); } }
+.planner-add-btn:hover { background: var(--primary-gradient-light); }
+/* Selección y botones flotantes en la esquina */
+.planner-day-cell.selected { outline: 3px solid rgba(79,70,229,0.12); box-shadow: 0 6px 18px rgba(79,70,229,0.06); }
+.planner-task-bar.selected { box-shadow: 0 8px 18px rgba(0,0,0,0.18); transform: translateY(-2px); }
+.planner-cell-actions { position: absolute; top: 6px; right: 6px; display:flex; gap:6px; z-index:60; opacity:0; pointer-events:none; transition: opacity .15s ease; }
+.planner-day-cell:hover .planner-cell-actions, .planner-day-cell.selected .planner-cell-actions { opacity:1; pointer-events:auto; }
+.planner-cell-action-btn { background: var(--card-background); color: var(--foreground); border:1px solid var(--border-light); padding:4px 6px; border-radius:6px; font-size:12px; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.06); }
+.planner-cell-action-btn:hover { background: var(--primary-gradient-light); }
+.planner-cell-action-btn:disabled { opacity:0.5; cursor:not-allowed; }
+.wide-modal .ant-modal-content { max-width: 1100px; }
+.wide-modal .ant-modal-body { padding-top: 8px; padding-bottom: 8px; }
+.wide-modal .ant-modal-footer { padding: 8px 24px; }
+.planner-nonworking-cell { background: repeating-linear-gradient(45deg, rgba(200,200,200,0.25) 0 8px, rgba(160,160,160,0.25) 8px 16px); }
+@media (prefers-color-scheme: dark) { .planner-nonworking-cell { background: repeating-linear-gradient(45deg, rgba(60,70,80,0.4) 0 8px, rgba(30,40,50,0.4) 8px 16px); } }
+.planner-nonworking-block { filter: grayscale(0.3) brightness(0.9); position:relative; }
+.planner-nonworking-overlay { font-size:10px; color: var(--muted); display:flex; align-items:center; justify-content:center; width:100%; text-align:center; padding:2px; }
+.planner-day-block .planner-add-btn:disabled { opacity:.4; cursor:not-allowed; }
+.planner-scroll::-webkit-scrollbar { height:10px; width:10px; }
+.planner-scroll::-webkit-scrollbar-track { background: transparent; }
+.planner-scroll::-webkit-scrollbar-thumb { background: linear-gradient(var(--primary-light), var(--primary)); border-radius: 20px; border:2px solid transparent; background-clip: padding-box; }
+.planner-scroll::-webkit-scrollbar-thumb:hover { background: linear-gradient(var(--primary), var(--primary-dark)); border:2px solid transparent; background-clip: padding-box; }
+
+/* Layout management responsive: limita altura solo en pantallas anchas */
+.mgmt-layout { height:auto; }
+@media (min-width: 1400px) {
+  .mgmt-layout { height: calc(100vh - 90px); overflow:hidden; }
+  .mgmt-layout > .flex-1 { overflow:hidden; }
+  .mgmt-layout .calendar-tabs .ant-tabs-tabpane-active { overflow:auto; }
+}
+
+
+/* Responsive: cuando la anchura es menor a 1300px, evitar que vistas ocupen 100vh
+   y permitir scroll vertical en su lugar. Esto anula clases de Tailwind como
+   h-screen/min-h-screen y estilos inline que usan 100vh o calc(100vh - ...). */
+@media (max-width: 1300px) {
+  /* Asegurar que la página puede crecer y hacer scroll */
+  html, body, #__next {
+    height: auto !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+  }
+
+  /* Anular utilidades de Tailwind que fijan la altura */
+  .h-screen, .min-h-screen, .max-h-screen {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+
+  /* Forzar que elementos con estilos inline que usan 100vh o calc(100vh...) no
+     fijen la altura en pantallas pequeñas. Se usa selector de atributo para
+     cubrir la mayoría de casos donde height aparece inline. */
+  [style*="100vh"], [style*="calc(100vh"] {
+    height: auto !important;
+
+  }
+
+  /* Tablas/lists/panels que dependen de calc(100vh - X) deben poder crecer */
+  [style*="calc(100vh"] * {
+    max-height: none !important;
+  }
+
+  /* Si hay contenedores con header fijo y contenido scrollable, permitir que
+     el contenido quede scrollable dentro del flujo normal (document scroll). */
+  main, .main, .content, .page {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+/* ================= Ant Design Switch personalizado ================= */
+.ant-switch {
+  position: relative;
+  height: 26px;
+  min-width: 54px;
+  background: linear-gradient(90deg, var(--secondary-50), var(--secondary-100));
+  border-radius: 999px !important;
+  box-shadow: inset 0 0 0 1px var(--border-light);
+  transition: all .35s cubic-bezier(.4,0,.2,1);
+}
+.ant-switch:hover { box-shadow: inset 0 0 0 1px var(--primary); }
+.ant-switch .ant-switch-handle {
+  width: 22px;
+  height: 22px;
+  top: 2px;
+  left: 2px;
+  border-radius: 50%;
+  background: var(--card-background);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.06);
+  transition: all .35s cubic-bezier(.4,0,.2,1);
+}
+.ant-switch:not(.ant-switch-checked) .ant-switch-handle::before { background: transparent; }
+.ant-switch.ant-switch-checked {
+  background: var(--primary-gradient-dark);
+  box-shadow: 0 0 0 1px var(--primary-dark), 0 4px 12px -4px rgba(234,88,12,0.5);
+}
+.ant-switch.ant-switch-checked .ant-switch-handle {
+  left: calc(100% - 24px);
+  background: linear-gradient(155deg, #fff, var(--primary-light));
+  box-shadow: 0 2px 4px rgba(234,88,12,0.35), 0 0 0 1px rgba(234,88,12,0.4);
+}
+.ant-switch:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(245,152,86,0.35); }
+.ant-switch-disabled { opacity: .45; cursor: not-allowed; }
+
+/* Tamaño pequeño coherente */
+.ant-switch-small { height: 20px; min-width: 42px; }
+.ant-switch-small .ant-switch-handle { width: 16px; height:16px; top:2px; }
+.ant-switch-small.ant-switch-checked .ant-switch-handle { left: calc(100% - 18px); }
+
+@media (prefers-color-scheme: dark) {
+  .ant-switch { background: linear-gradient(90deg, rgba(30,41,59,0.85), rgba(51,65,85,0.6)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); }
+  .ant-switch.ant-switch-checked { box-shadow: 0 0 0 1px rgba(248,155,80,0.5), 0 4px 14px -4px rgba(248,155,80,0.4); }
+  .ant-switch .ant-switch-handle { background: rgba(255,255,255,0.9); }
+}
+
+/* ================= Ant Design Tabs personalizados ================= */
+.ant-tabs-top > .ant-tabs-nav, .ant-tabs-bottom > .ant-tabs-nav { margin: 0 0 1rem 0; }
+.ant-tabs-nav { background: var(--card-background); border:1px solid var(--border-light); padding: .35rem .75rem; border-radius: 0.85rem; backdrop-filter: blur(6px); }
+.ant-tabs-nav::before { display:none; }
+.ant-tabs-nav .ant-tabs-tab { position:relative; padding: .4rem .9rem; margin:0 .25rem; border-radius: .65rem; font-weight:500; color: var(--muted); transition: all .25s ease; }
+.ant-tabs-nav .ant-tabs-tab:hover { color: var(--secondary); background: var(--primary-gradient-light); }
+.ant-tabs-nav .ant-tabs-tab-active { color: var(--secondary); background: linear-gradient(125deg, var(--primary-light) 0%, var(--primary-light-100) 60%, transparent); box-shadow: 0 4px 12px -6px rgba(0,0,0,0.15); }
+.ant-tabs-ink-bar { background: var(--primary-dark); height:3px; border-radius: 3px; }
+
+/* Compactar contenido cuando se usa en tarjetas */
+.ant-tabs-content-holder { flex:1; min-height:0; }
+.calendar-tabs .ant-tabs-content-holder { flex:1; min-height:0; display:flex; flex-direction:column; }
+.calendar-tabs .ant-tabs-content { flex:1; display:flex; flex-direction:column; }
+/* Ajuste: solo el pane activo visible; panes inactivos ocultos */
+.calendar-tabs .ant-tabs-tabpane { flex:1; min-height:0; overflow:auto; }
+.calendar-tabs .ant-tabs-tabpane:not(.ant-tabs-tabpane-active) { display: none !important; }
+
+@media (prefers-color-scheme: dark) {
+  .ant-tabs-nav { background: rgba(30,41,59,0.75); border-color: rgba(255,255,255,0.06); }
+  .ant-tabs-nav .ant-tabs-tab-active { background: linear-gradient(125deg, rgba(248,155,80,0.25) 0%, rgba(234,88,12,0.15) 60%, transparent); }
+  .ant-tabs-ink-bar { background: var(--primary); }
+}
+
