@@ -1,0 +1,71 @@
+# Root gitignore consolidating backend & frontend patterns
+
+### General
+.DS_Store
+*.log
+logs/
+*.pid
+*.seed
+*.csv
+
+### Env & secrets
+.env
+.env.*
+!*.env.example
+Backend/.env
+Backend/.env.*
+Frontend/zyro-web/.env
+Frontend/zyro-web/.env.*
+!important.env.example
+
+### Python (Backend)
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+.build/
+.eggs/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage*
+htmlcov/
+.pyre/
+.venv/
+venv/
+.envrc
+
+### Node / Next.js (Frontend)
+node_modules/
+Frontend/zyro-web/node_modules/
+.next/
+.next.static/
+out/
+build/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vercel/
+
+### IDE & tooling
+.vscode/
+.idea/
+*.swp
+*.swo
+*.iml
+
+### Generated ERD outputs
+erd_output/
+
+### Docker
+**/docker-data/
+*.tar
+
+### Coverage / reports
+coverage/
+Backend/coverage/
+
+# Ignore compiled assets if later added
+public/build/

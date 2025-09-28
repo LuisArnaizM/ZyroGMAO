@@ -49,8 +49,10 @@ def _ensure_access(user_ctx, target_user_id: int, subordinate_ids):
 
 
 @router.get("/{user_id}/pattern", response_model=List[WorkingDayPattern])
-async def get_pattern(user_id: int, db: AsyncSession = Depends(get_db), current=Depends(require_role(["Admin","Supervisor"]))):
-    if current["role"] != "Admin":
+async def get_pattern(user_id: int, db: AsyncSession = Depends(get_db), current=Depends(require_role(["Admin","Supervisor","Tecnico"]))):
+    if current["role"] == "Tecnico" and current["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    if current["role"] == "Supervisor":
         subs = await _get_subordinate_user_ids(db, current["id"])
         _ensure_access(current, user_id, subs)
     rows = await list_pattern(db, user_id)
@@ -65,24 +67,33 @@ async def put_pattern(user_id: int, payload: List[WorkingDayPattern], db: AsyncS
     return [WorkingDayPattern(weekday=r.weekday, hours=r.hours, is_active=r.is_active) for r in rows]
 
 @router.get("/{user_id}/special", response_model=List[SpecialDay])
-async def get_special_days(user_id: int, start: date = Query(...), end: date = Query(...), db: AsyncSession = Depends(get_db), current=Depends(require_role(["Admin","Supervisor"]))):
-    if current["role"] != "Admin":
+async def get_special_days(user_id: int, start: date = Query(...), end: date = Query(...), db: AsyncSession = Depends(get_db), current=Depends(require_role(["Admin","Supervisor","Tecnico"]))):
+    # Técnicos solo pueden ver sus propios especiales
+    if current["role"] == "Tecnico" and current["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    if current["role"] == "Supervisor":
         subs = await _get_subordinate_user_ids(db, current["id"])
         _ensure_access(current, user_id, subs)
     rows = await list_special_days(db, user_id, start, end)
     return rows
 
 @router.post("/{user_id}/special", response_model=SpecialDay)
-async def post_special_day(user_id: int, data: SpecialDayCreate, db: AsyncSession = Depends(get_db), current=Depends(require_role(["Admin","Supervisor"]))):
-    if current["role"] != "Admin":
+async def post_special_day(user_id: int, data: SpecialDayCreate, db: AsyncSession = Depends(get_db), current=Depends(require_role(["Admin","Supervisor","Tecnico"]))):
+    # Técnicos solo pueden crear para sí mismos
+    if current["role"] == "Tecnico" and current["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    if current["role"] == "Supervisor":
         subs = await _get_subordinate_user_ids(db, current["id"])
         _ensure_access(current, user_id, subs)
     row = await add_special_day(db, user_id, data)
     return row
 
 @router.delete("/{user_id}/special/{special_id}")
-async def delete_special(user_id: int, special_id: int, db: AsyncSession = Depends(get_db), current=Depends(require_role(["Admin","Supervisor"]))):
-    if current["role"] != "Admin":
+async def delete_special(user_id: int, special_id: int, db: AsyncSession = Depends(get_db), current=Depends(require_role(["Admin","Supervisor","Tecnico"]))):
+    # Técnicos solo pueden borrar los suyos
+    if current["role"] == "Tecnico" and current["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    if current["role"] == "Supervisor":
         subs = await _get_subordinate_user_ids(db, current["id"])
         _ensure_access(current, user_id, subs)
     ok = await delete_special_day(db, user_id, special_id)
@@ -108,8 +119,11 @@ async def get_calendar_week(user_id: int, start: date = Query(None), days: int =
 
 
 @router.post("/{user_id}/vacations", response_model=List[SpecialDay])
-async def post_vacation_range(user_id: int, data: VacationRangeCreate, db: AsyncSession = Depends(get_db), current=Depends(require_role(["Admin","Supervisor"]))):
-    if current["role"] != "Admin":
+async def post_vacation_range(user_id: int, data: VacationRangeCreate, db: AsyncSession = Depends(get_db), current=Depends(require_role(["Admin","Supervisor","Tecnico"]))):
+    # Técnicos solo pueden crear sus propias vacaciones
+    if current["role"] == "Tecnico" and current["id"] != user_id:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    if current["role"] == "Supervisor":
         subs = await _get_subordinate_user_ids(db, current["id"])
         _ensure_access(current, user_id, subs)
     rows = await add_vacation_range(db, user_id, data.start_date, data.end_date, data.reason)

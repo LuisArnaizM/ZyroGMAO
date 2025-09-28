@@ -1,1 +1,42 @@
+# Environment & secrets
 .env
+.env.*
+!*.env.example
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Packaging
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+*.egg
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+
+# Testing / coverage
+.pytest_cache/
+.mypy_cache/
+.coverage*
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Generated diagrams
+../erd_output/
