@@ -2,7 +2,7 @@
 
 Sistema integral de Gestión de Mantenimiento Asistido por Ordenador (GMAO / CMMS) orientado a la gestión de activos industriales, planificación preventiva/correctiva, trazabilidad de incidencias y soporte para analítica futura con datos IoT.
 
-> Este repositorio contiene el **Backend (FastAPI + PostgreSQL)** y el **Frontend (Next.js + Ant Design + Tailwind)**. Está estructurado para servir como proyecto portfolio demostrando arquitectura full‑stack moderna.
+> Este repositorio contiene el **Backend (FastAPI + PostgreSQL)** y el **Frontend (Next.js + Ant Design + Tailwind)**.
 
 ## 🧱 Arquitectura General
 
@@ -31,8 +31,6 @@ Sistema integral de Gestión de Mantenimiento Asistido por Ordenador (GMAO / CMM
 - Calendario de técnicos (días laborales, especiales, vacaciones)
 - Control de Inventario básico
 - Autenticación JWT + Roles (Admin, Supervisor, Técnico, etc.)
-- Script de generación de ERD (PlantUML / Mermaid / dbdiagram)
-- Internacionalización inicial (frontend base en inglés)
 
 ## 📂 Estructura del Repositorio
 
@@ -66,7 +64,6 @@ Frontend/
 | Base Datos| PostgreSQL (principal), (Futuro: MongoDB para sensores) |
 | Auth      | JWT (python-jose), passlib bcrypt |
 | Infra     | Docker Compose (API + PostgreSQL) |
-| Testing   | Pytest + HTTPX |
 
 ## 🔐 Roles Principales
 
@@ -128,12 +125,6 @@ Si tienes un script de seed (`init_database.py` o similar) ejecútalo tras levan
 python Backend/init_database.py  # (si procede)
 ```
 
-## 🧪 Tests Backend
-```bash
-cd Backend
-pytest -q
-```
-
 ## 🗃️ Modelo de Datos (Resumen)
 
 Jerarquía básica:
@@ -183,7 +174,6 @@ El frontend tiene base en inglés y se irá extendiendo la traducción a todas l
 - Integrar lectura de sensores reales y almacenamiento en MongoDB.
 - Alertas y notificaciones (email / websockets).
 - CI/CD (GitHub Actions) + despliegue en contenedores.
-- Tests de integración ampliados.
 
 ## 🤝 Contribución
 1. Haz fork
@@ -196,9 +186,5 @@ Pending (elige MIT / Apache 2.0 / GPL según tu preferencia).
 
 ## 👤 Autor
 **Luis Arnaiz**  
-Full‑stack Developer | Especializado en mantenimiento industrial digitalizado.
+Full‑stack Developer | Especializado en  Industria 4.0 e Inteligencia Artificial.
 
-Si usas este proyecto en tu portfolio, puedes acompañarlo con capturas de: Planner, Calendario de Técnicos, Órdenes de Trabajo, y el ERD generado.
-
----
-¿Quieres que genere también un README separado en `Backend/` y otro en `Frontend/` alineados con este? Pídelo y lo preparo.
