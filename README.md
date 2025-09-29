@@ -120,9 +120,8 @@ npm run dev
 Abrir: http://localhost:3000
 
 ### 4. Credenciales Iniciales
-Si tienes un script de seed (`init_database.py` o similar) ejecútalo tras levantar la API para crear usuarios de prueba.
 ```bash
-python Backend/init_database.py  # (si procede)
+python Backend/init_database.py 
 ```
 
 ## 🗃️ Modelo de Datos (Resumen)
@@ -135,27 +134,8 @@ Organization → Asset → Component → Sensor
 
 Incluye además: Failures, Inventario, Calendario laboral (user_working_days, user_special_days).
 
-### ERD
-Genera diagramas en `erd_output/`:
-```bash
-python Scripts/generate_erd.py
-```
-Formatos: PlantUML (`schema.puml`), Mermaid (`schema.mmd`), dbdiagram (`schema.dbdiagram`).
-
-Reflexión directa contra BD (si está corriendo y quieres basarte en el esquema real):
-```bash
-python Scripts/generate_erd.py --reflect --url postgresql+asyncpg://postgres:postgres@localhost:5432/gmao
-```
-
 ## 🌐 Internacionalización
 El frontend tiene base en inglés y se irá extendiendo la traducción a todas las vistas. Se usa `react-i18next`.
-
-## 📦 Scripts Útiles
-| Script | Ubicación | Descripción |
-|--------|-----------|-------------|
-| `generate_erd.py` | `Backend/Scripts/` | Exporta diagrama ERD (PlantUML, Mermaid, dbdiagram) |
-| `reset_db.py` | `Backend/` | Resetea base (si implementado) |
-| `init_database.py` | `Backend/` | Población inicial (si procede) |
 
 ## 🧩 Decisiones de Diseño
 - Separación clara `models` / `schemas` / `routers` / `controllers` para escalabilidad.
@@ -182,7 +162,7 @@ El frontend tiene base en inglés y se irá extendiendo la traducción a todas l
 4. PR descriptivo con capturas / endpoints afectados
 
 ## 📄 Licencia
-Pending (elige MIT / Apache 2.0 / GPL según tu preferencia).
+Pending Apache 2.0 según tu preferencia.
 
 ## 👤 Autor
 **Luis Arnaiz**  

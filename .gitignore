@@ -10,10 +10,10 @@ logs/
 
 ### Env & secrets
 .env
-.env.*
+.env
 !*.env.example
 Backend/.env
-Backend/.env.*
+Backend/.env
 Frontend/zyro-web/.env
 Frontend/zyro-web/.env.*
 !important.env.example
