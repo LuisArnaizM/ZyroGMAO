@@ -32,6 +32,9 @@ from app.models.enums import (
 logger = logging.getLogger(__name__)
 
 
+# Add at the top of the file after imports - base reference date for demo data
+DEMO_BASE_DATE = datetime(2025, 10, 7, 10, 0, 0, tzinfo=timezone.utc)  # October 7, 2025 as base reference
+
 def _to_naive(dt: datetime | None) -> datetime | None:
     """Convierte un datetime con tzinfo a naive en UTC si es necesario.
 
@@ -361,7 +364,7 @@ async def _ensure_users(session: AsyncSession, departments: list[Department]) ->
 
 
 async def _create_assets_components_inventory(session: AsyncSession, supervisors: list[User], technicians: list[User]):
-    now = datetime.now(timezone.utc)
+    now = DEMO_BASE_DATE  # Use fixed demo date instead of datetime.now(timezone.utc)
     existing_assets = (await session.execute(select(Asset))).scalars().all()
     if len(existing_assets) >= 15:
         # Normalizar estados existentes a los usados por el backend (UPPERCASE)
@@ -490,7 +493,7 @@ async def _create_maintenance_plans(session: AsyncSession, assets: list[Asset], 
             frequency_months=None,
             estimated_duration=round(random.uniform(1.0, 8.0), 1),
             estimated_cost=round(random.uniform(50.0, 500.0), 2),
-            start_date=datetime.now(timezone.utc),
+            start_date=DEMO_BASE_DATE,
             next_due_date=None,
             last_execution_date=None,
             active=True,
@@ -512,21 +515,21 @@ async def _create_failures_orders_tasks_maintenance(
     technicians: list[User],
     departments: list[Department],
 ):
-    now = datetime.now(timezone.utc)
-    # Evitar duplicar masivo
+    now = DEMO_BASE_DATE  # Use fixed demo date
+    # Avoid massive duplication
     existing_tasks = (await session.execute(select(func.count()).select_from(Task))).scalar() or 0
     if existing_tasks >= 400:
         return
 
     all_tasks: list[Task] = []
 
-    # Fallos por asset (creamos un histórico temporal consistente para KPIs MTBF/MTTF)
+    # Failures per asset (create temporal consistent history for MTBF/MTTF KPIs)
     failures_by_asset: dict[int, list[Failure]] = {}
-    horizon_days = 120  # ~4 meses hacia atrás
-    base_start = now - timedelta(days=horizon_days)
+    horizon_days = 120  # ~4 months back from October 2025
+    base_start = now - timedelta(days=horizon_days)  # Early June 2025
     for asset in assets:
         failures_for_asset: list[Failure] = []
-        # Número de fallos controlado para generar gaps (entre 4 y 8)
+        # Number of controlled failures to generate gaps (between 4 and 8)
         num_failures = random.randint(4, 8)
         failure_times = sorted([
             base_start + timedelta(days=random.uniform(0, horizon_days)) for _ in range(num_failures)
@@ -536,17 +539,17 @@ async def _create_failures_orders_tasks_maintenance(
             comp_candidates = [c for c in components if c.asset_id == asset.id]
             comp = random.choice(comp_candidates) if comp_candidates else None
             reported_date = ft
-            # Duración de fallo entre 2h y 48h
+            # Failure duration between 2h and 48h
             repair_hours = random.uniform(2, 48)
             resolved_date = reported_date + timedelta(hours=repair_hours)
-            # Estado final (60% resolved, 30% investigating, 10% pending)
+            # Final status (60% resolved, 30% investigating, 10% pending)
             status_choice = random.choices(
                 population=[FailureStatus.RESOLVED.value, FailureStatus.INVESTIGATING.value, FailureStatus.PENDING.value],
                 weights=[0.6, 0.3, 0.1],
                 k=1
             )[0]
             if status_choice != FailureStatus.RESOLVED.value:
-                # Algunas no resueltas aún: quitar resolved_date parcialmente
+                # Some not resolved yet: remove resolved_date partially
                 if random.random() < 0.5:  # noqa: S311
                     resolved_date = None
             severity_choice = random.choices(
@@ -570,10 +573,10 @@ async def _create_failures_orders_tasks_maintenance(
         failures_by_asset[asset.id] = failures_for_asset
 
     for asset in assets:
-        # Espaciamos WO a lo largo del horizonte temporal
+        # Space WOs throughout the temporal horizon (last ~3.5 months)
         wo_count = 12
         wo_times = sorted([
-            now - timedelta(days=random.uniform(0, 110)) for _ in range(wo_count)
+            now - timedelta(days=random.uniform(0, 110)) for _ in range(wo_count)  # June to October 2025
         ])
         for k, created_at in enumerate(wo_times, start=1):
             dep = random.choice(departments)
@@ -621,9 +624,9 @@ async def _create_failures_orders_tasks_maintenance(
                     weights=[0.3, 0.3, 0.4],
                     k=1
                 )[0]
-                # Tiempos relativos a created_at del WO
+                # Relative times to WO created_at
                 task_created = created_at + timedelta(hours=random.uniform(0, 48))
-                # Simulamos horas reales sólo si completada
+                # Simulate real hours only if completed
                 actual_hours = None
                 if task_status == TaskStatus.COMPLETED.value:
                     actual_hours = round(random.uniform(0.5, 10.0), 1)
@@ -632,7 +635,7 @@ async def _create_failures_orders_tasks_maintenance(
                 assigned_user_id = (random.choice(technicians).id if technicians else None)
                 if assigned_user_id:
                     from app.models.calendar import UserWorkingDay, UserSpecialDay
-                    # Cache patrones
+                    # Cache patterns
                     if not hasattr(session, '_seed_work_pattern'):
                         session._seed_work_pattern = {}
                     if assigned_user_id not in session._seed_work_pattern:
@@ -644,7 +647,7 @@ async def _create_failures_orders_tasks_maintenance(
                             rows = (await session.execute(select(UserWorkingDay).where(UserWorkingDay.user_id==assigned_user_id))).scalars().all()
                         session._seed_work_pattern[assigned_user_id] = {r.weekday: (r.hours if r.is_active else 0.0) for r in rows}
                     pattern = session._seed_work_pattern[assigned_user_id]
-                    # Cache días especiales
+                    # Cache special days
                     if not hasattr(session, '_seed_specials'):
                         specials = (await session.execute(select(UserSpecialDay))).scalars().all()
                         session._seed_specials = {(s.user_id, s.date): s for s in specials}
@@ -655,7 +658,7 @@ async def _create_failures_orders_tasks_maintenance(
                         spec = special_map.get((assigned_user_id, d_date))
                         weekday = d_date.weekday()
                         base_hours = pattern.get(weekday, 0.0)
-                        # Capacidad día
+                        # Day capacity
                         if spec:
                             if not spec.is_working or (spec.is_working and spec.hours is not None and spec.hours <= 0):
                                 due = due + timedelta(days=1)
@@ -701,7 +704,7 @@ async def _create_failures_orders_tasks_maintenance(
             description=f"Maintenance for {task.title}",
             status=_to_db_enum(random.choice([MaintenanceStatus.SCHEDULED.value, MaintenanceStatus.IN_PROGRESS.value, MaintenanceStatus.COMPLETED.value, MaintenanceStatus.CANCELLED.value])),
             maintenance_type=_to_db_enum(random.choice([MaintenanceType.PREVENTIVE.value, MaintenanceType.CORRECTIVE.value, MaintenanceType.PREDICTIVE.value])),
-            scheduled_date=_to_naive(datetime.now(timezone.utc) + timedelta(days=random.randint(-20, 30))),
+            scheduled_date=_to_naive(DEMO_BASE_DATE + timedelta(days=random.randint(-20, 30))),
             completed_date=None,
             duration_hours=round(random.uniform(0.5, 12.0), 1),
             cost=round(random.uniform(20.0, 400.0), 2),
@@ -714,11 +717,11 @@ async def _create_failures_orders_tasks_maintenance(
         session.add(maint)
     await session.flush()
 
-    # Consumos de inventario en ~30% de tareas distribuidos últimos 30 días
+    # Inventory consumption in ~30% of tasks distributed over last 30 days
     from app.models.calendar import UserSpecialDay, UserWorkingDay
     inv_map = {inv.component_id: inv for inv in (await session.execute(select(InventoryItem))).scalars().all()}
     usage_tasks = random.sample(all_tasks, max(1, int(len(all_tasks) * 0.3)))
-    today = datetime.now(timezone.utc).date()
+    today = DEMO_BASE_DATE.date()  # October 7, 2025
     for idx, task in enumerate(usage_tasks):
         day_offset = idx % 30
         usage_date = today - timedelta(days=day_offset)
@@ -742,66 +745,66 @@ async def _create_failures_orders_tasks_maintenance(
             session.add(tuc)
             inv.quantity = float(inv.quantity) - qty_use
 
-    # NOTA: El ajuste definitivo de due_date evitando días no laborables (patrón + especiales)
-    # se realiza fuera (ver _adjust_task_due_dates) para poder reutilizarlo incluso cuando
-    # el seed detecta ya muchas tareas y solo queremos corregir fechas.
+    # The FINAL adjustment of due_date avoiding non-working days (pattern + special)
+    # is performed outside (see _adjust_task_due_dates) to be able to reuse it even when
+    # the seed detects many tasks already and only wants to correct dates.
 
 
 async def _ensure_calendar_demo_data(session: AsyncSession, supervisors: list[User], technicians: list[User]):
-    """Crea algunos días especiales/vacaciones de ejemplo si aún no existen.
+    """Creates some special days/vacation examples if they don't exist yet.
 
-    Se ejecuta siempre (idempotente) antes de generar tareas para que las fechas
-    se puedan ajustar adecuadamente.
+    Always runs (idempotent) before generating tasks so that dates
+    can be adjusted appropriately.
     """
     from app.models.calendar import UserSpecialDay
-    today = datetime.now(timezone.utc).date()
-    year_start = today.replace(month=1, day=1)
+    today = DEMO_BASE_DATE.date()  # October 7, 2025
+    year_start = today.replace(month=1, day=1)  # January 1, 2025
     try:
-        # Vacaciones supervisor principal: semana 30 (aprox fin Julio)
+        # Main supervisor vacation: week 30 (around end of July 2025)
         if supervisors:
             sup = supervisors[0]
-            vac_start = year_start + timedelta(days=29*7)  # aprox semana 30 inicio
-            for i in range(5):
+            vac_start = year_start + timedelta(days=29*7)  # around week 30 start (July 21, 2025)
+            for i in range(5):  # 5 working days vacation
                 d = vac_start + timedelta(days=i)
                 if not (await session.execute(select(UserSpecialDay).where(UserSpecialDay.user_id==sup.id, UserSpecialDay.date==d))).scalar_one_or_none():
-                    session.add(UserSpecialDay(user_id=sup.id, date=d, is_working=False, hours=0.0, reason="Vacaciones"))
-        # Festivo global (1 Mayo) para primeros técnicos
+                    session.add(UserSpecialDay(user_id=sup.id, date=d, is_working=False, hours=0.0, reason="Vacation"))
+        # Global holiday (May 1st, 2025) for first technicians
         try:
-            may1 = today.replace(month=5, day=1)
+            may1 = datetime(2025, 5, 1).date()  # International Workers' Day 2025
         except ValueError:
-            # Si hoy es 29/30 Feb (no aplicaría), elegir 1 Junio como fallback
-            may1 = today.replace(month=6, day=1)
+            # Fallback if there's any issue
+            may1 = datetime(2025, 6, 1).date()
         for tech in technicians[:5]:
             if not (await session.execute(select(UserSpecialDay).where(UserSpecialDay.user_id==tech.id, UserSpecialDay.date==may1))).scalar_one_or_none():
-                session.add(UserSpecialDay(user_id=tech.id, date=may1, is_working=False, hours=0.0, reason="Día del Trabajador"))
-        # Media jornada de formación en 3 días para primer técnico
+                session.add(UserSpecialDay(user_id=tech.id, date=may1, is_working=False, hours=0.0, reason="International Workers' Day"))
+        # Half-day training in 3 days for first technician (October 10, 2025)
         if technicians:
-            d_partial = today + timedelta(days=3)
+            d_partial = today + timedelta(days=3)  # October 10, 2025
             t0 = technicians[0]
             if not (await session.execute(select(UserSpecialDay).where(UserSpecialDay.user_id==t0.id, UserSpecialDay.date==d_partial))).scalar_one_or_none():
-                session.add(UserSpecialDay(user_id=t0.id, date=d_partial, is_working=True, hours=4.0, reason="Formación"))
+                session.add(UserSpecialDay(user_id=t0.id, date=d_partial, is_working=True, hours=4.0, reason="Training"))
         await session.flush()
     except Exception as e:  # noqa: BLE001
-        logger.warning(f"Calendario demo parcial omitido: {e}")
+        logger.warning(f"Partial demo calendar omitted: {e}")
 
 
 async def _adjust_task_due_dates(session: AsyncSession):
-    """Ajusta due_date de tareas que caigan en días no laborables para el usuario asignado.
+    """Adjusts due_date of tasks that fall on non-working days for the assigned user.
 
-    Considera:
-      - Días especiales (UserSpecialDay) no laborables
-      - Patrón de UserWorkingDay (weekday con 0 horas => no laborable)
-    Desplaza la fecha al siguiente día laborable hasta 10 intentos (seguridad).
+    Considers:
+      - Special days (UserSpecialDay) non-working
+      - UserWorkingDay pattern (weekday with 0 hours => non-working)
+    Shifts the date to the next working day up to 10 attempts (safety).
     """
     from app.models.calendar import UserSpecialDay, UserWorkingDay
     tasks = (await session.execute(select(Task).where(Task.assigned_to.isnot(None), Task.due_date.isnot(None)))).scalars().all()
     if not tasks:
         return
-    # Cache patrones y especiales por usuario
-    # Especiales: map (user_id, date)->is_working,hours
+    # Cache patterns and specials by user
+    # Special: map (user_id, date)->is_working,hours
     specials = (await session.execute(select(UserSpecialDay))).scalars().all()
     special_map = {(s.user_id, s.date): s for s in specials}
-    # Working pattern por user: weekday->hours
+    # Working pattern by user: weekday->hours
     working_by_user: dict[int, dict[int, float]] = {}
     changed = 0
     for task in tasks:
@@ -810,33 +813,33 @@ async def _adjust_task_due_dates(session: AsyncSession):
         uid = task.assigned_to
         if uid is None:
             continue
-        # Cargar patrón on-demand
+        # Load pattern on-demand
         if uid not in working_by_user:
             rows = (await session.execute(select(UserWorkingDay).where(UserWorkingDay.user_id==uid))).scalars().all()
             if not rows:
-                # crear por defecto (Mon-Fri 8h)
+                # create default (Mon-Fri 8h)
                 for wd in range(7):
                     session.add(UserWorkingDay(user_id=uid, weekday=wd, hours=(8.0 if wd < 5 else 0.0), is_active=True))
                 await session.flush()
                 rows = (await session.execute(select(UserWorkingDay).where(UserWorkingDay.user_id==uid))).scalars().all()
             working_by_user[uid] = {r.weekday: (r.hours if r.is_active else 0.0) for r in rows}
-        # Evaluar la fecha
+        # Evaluate the date
         attempts = 0
         while attempts < 10:
             due_date_date = task.due_date.date()
             spec = special_map.get((uid, due_date_date))
             if spec:
-                if not spec.is_working:  # Día especial no laborable
+                if not spec.is_working:  # Special non-working day
                     task.due_date = task.due_date + timedelta(days=1)
                     attempts += 1
                     continue
-                # Si is_working True y hours None -> usar patrón por defecto; si horas 0 => no laborable
+                # If is_working True and hours None -> use default pattern; if hours 0 => non-working
                 if spec.is_working and spec.hours is not None and spec.hours <= 0:
                     task.due_date = task.due_date + timedelta(days=1)
                     attempts += 1
                     continue
-                break  # es laborable especial
-            # No especial: usar patrón weekday
+                break  # it's a working special day
+            # Not special: use weekday pattern
             weekday = due_date_date.weekday()
             hours = working_by_user[uid].get(weekday, 0.0)
             if hours <= 0.0:
@@ -847,7 +850,7 @@ async def _adjust_task_due_dates(session: AsyncSession):
         if attempts and attempts < 10:
             changed += 1
     if changed:
-        logger.info("Ajustadas %s due_date de tareas no laborables", changed)
+        logger.info("Adjusted %s due_date of non-working tasks", changed)
         await session.flush()
 
 

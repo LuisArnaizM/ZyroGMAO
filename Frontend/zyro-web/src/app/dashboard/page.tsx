@@ -14,7 +14,7 @@ import type { TaskUsedComponentRead } from "../types/inventory";
 import { ManagementPageLayout } from "../components/layout/ManagementPageLayout";
 import ProtectedPage from "../components/security/ProtectedPage";
 
-// Eliminado WorkOrder mock; se prioriza KPI de gasto diario
+// Removed WorkOrder mock; prioritizing daily spending KPI
 
 type KpiCardProps = {
   icon: React.ReactNode;
@@ -55,7 +55,7 @@ function KpiCard({ icon, label, value, helpText, color, trend }: KpiCardProps) {
 
 function TrendsChart({ trends }: { trends: KpiTrends | null }) {
   const [hover, setHover] = useState<{ idx: number; type: 'created' | 'completed'; value: number } | null>(null);
-  if (!trends || trends.points.length === 0) return <div className="text-sm text-gray-500">Sin datos de tendencia aún.</div>;
+  if (!trends || trends.points.length === 0) return <div className="text-sm text-gray-500">No trend data yet.</div>;
   const maxVal = Math.max(1, ...trends.points.map(p => Math.max(p.created, p.completed)));
   const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(maxVal * f));
   return (
@@ -104,8 +104,8 @@ function TrendsChart({ trends }: { trends: KpiTrends | null }) {
         </div>
       </div>
   <div className="flex justify-center gap-4 mt-3 text-xs">
-        <div className="flex items-center gap-1 text-blue-600"><span className="inline-block w-3 h-3 bg-blue-400 rounded-sm"></span> Creadas</div>
-        <div className="flex items-center gap-1 text-green-700"><span className="inline-block w-3 h-3 bg-green-500 rounded-sm"></span> Completadas</div>
+        <div className="flex items-center gap-1 text-blue-600"><span className="inline-block w-3 h-3 bg-blue-400 rounded-sm"></span> Created</div>
+        <div className="flex items-center gap-1 text-green-700"><span className="inline-block w-3 h-3 bg-green-500 rounded-sm"></span> Completed</div>
       </div>
     </div>
   );
@@ -113,7 +113,7 @@ function TrendsChart({ trends }: { trends: KpiTrends | null }) {
 
 function DailySpendChart({ data }: { data: { label: string; amount: number }[] }) {
   const [hover, setHover] = useState<number | null>(null);
-  if (!data || data.length === 0) return <div className="text-sm text-gray-500">Sin datos de gasto aún.</div>;
+  if (!data || data.length === 0) return <div className="text-sm text-gray-500">No spending data yet.</div>;
   const maxVal = Math.max(1, ...data.map(d => d.amount));
   const ticks = [0, 0.5, 1].map(f => +(maxVal * f).toFixed(0));
   return (
@@ -150,7 +150,7 @@ function DailySpendChart({ data }: { data: { label: string; amount: number }[] }
         </div>
       </div>
       <div className="flex justify-center gap-4 mt-3 text-xs text-purple-700">
-        <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-purple-500 rounded-sm"></span> Gasto diario (€)</div>
+        <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 bg-purple-500 rounded-sm"></span> Daily spending (€)</div>
       </div>
     </div>
   );
@@ -166,7 +166,7 @@ function formatHours(h?: number | null) {
 
 function MonthlyResponseChart({ data }: { data: { month: string; avg_response_hours: number | null }[] }) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  if (!data || data.length === 0) return <div className="text-sm text-gray-500">Sin datos aún.</div>;
+  if (!data || data.length === 0) return <div className="text-sm text-gray-500">No data yet.</div>;
   const max = Math.max(1, ...data.map(d => d.avg_response_hours ?? 0));
   const ticks = [0, 0.5, 1].map(f => +(max * f).toFixed(0));
   return (
@@ -203,7 +203,7 @@ function MonthlyResponseChart({ data }: { data: { month: string; avg_response_ho
           </div>
         </div>
       </div>
-      <div className="mt-3 text-xs text-blue-700 flex items-center gap-1"><span className="inline-block w-3 h-3 bg-blue-600 rounded-sm"/> Media horas</div>
+      <div className="mt-3 text-xs text-blue-700 flex items-center gap-1"><span className="inline-block w-3 h-3 bg-blue-600 rounded-sm"/> Average hours</div>
     </div>
   );
 }
@@ -234,8 +234,8 @@ export default function Dashboard() {
           setMonthlyResponse(monthlyResp.points);
         }
       } catch (e) {
-        // Silenciar por ahora, mostrar placeholders
-        console.error('Error cargando KPIs', e);
+        // Silent for now, show placeholders
+        console.error('Error loading KPIs', e);
       }
     })();
 
@@ -243,7 +243,7 @@ export default function Dashboard() {
   }, [kpiService, inventoryService]);
 
   function buildDailySpend(usage: TaskUsedComponentRead[]): { label: string; amount: number }[] {
-    // Agrupar por día (últimos 30 días)
+    // Group by day (last 30 days)
     const byDay = new Map<string, number>();
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -251,14 +251,14 @@ export default function Dashboard() {
 
     for (const u of usage) {
       const dt = new Date(u.created_at);
-      // ignorar fuera de ventana
+      // ignore outside window
       if (dt < start) continue;
       const dayKey = dt.toISOString().slice(0, 10); // YYYY-MM-DD
       const amount = (u.unit_cost_snapshot ?? 0) * u.quantity;
       byDay.set(dayKey, (byDay.get(dayKey) ?? 0) + amount);
     }
 
-    // Construir puntos de cada día (rellenando vacíos)
+    // Build points for each day (filling gaps)
     const points: { label: string; amount: number }[] = [];
     for (let i = 0; i < 30; i++) {
       const d = new Date(start);
@@ -273,32 +273,32 @@ export default function Dashboard() {
   return (
     <ProtectedPage>
     <ManagementPageLayout>
-      {/* KPIs Grid (dinámicos) */}
+      {/* KPIs Grid (dynamic) */}
   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
         <KpiCard
           icon={<FaExclamationTriangle />}
-          label="Órdenes abiertas"
+          label="Open orders"
           value={kpi?.open_workorders ?? 0}
-          helpText={`Planificadas: ${kpi ? Math.round(kpi.planned_pct) : 0}%`}
+          helpText={`Planned: ${kpi ? Math.round(kpi.planned_pct) : 0}%`}
           color="#F59E0B"
         />
         <KpiCard
           icon={<FaTools />}
-          label="En progreso"
+          label="In progress"
           value={kpi?.in_progress_workorders ?? 0}
           helpText={`MTTR: ${formatHours(kpi?.mttr_hours)}`}
           color="#3B82F6"
         />
         <KpiCard
           icon={<FaCheckCircle />}
-          label="Completadas (30d)"
+          label="Completed (30d)"
           value={kpi?.completed_workorders_30d ?? 0}
-          helpText={`Tiempo medio cierre: ${formatHours(kpi?.avg_completion_time_hours)}`}
+          helpText={`Avg completion time: ${formatHours(kpi?.avg_completion_time_hours)}`}
           color="#10B981"
         />
         <KpiCard
           icon={<FaCog />}
-          label="Atrasadas"
+          label="Overdue"
           value={kpi?.overdue_workorders ?? 0}
           helpText={`MTBF: ${formatHours(kpi?.mtbf_hours)}`}
           color="#EF4444"
@@ -314,26 +314,26 @@ export default function Dashboard() {
 
       {/* Charts Grid: 50/50 width with same height and internal scroll */}
   <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Card 1: Gasto diario */}
+        {/* Card 1: Daily spending */}
         <div className="elegant-card p-6 h-[360px] flex flex-col overflow-hidden">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Gasto diario de componentes</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Daily component spending</h3>
           <div className="flex-1 min-h-0 overflow-auto">
             <DailySpendChart data={dailySpend} />
           </div>
         </div>
-        {/* Card 2: Tendencia semanal */}
+        {/* Card 2: Weekly trend */}
         <div className="elegant-card p-6 h-[360px] flex flex-col overflow-hidden">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Tendencia semanal</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Weekly trend</h3>
           <div className="flex-1 min-h-0 overflow-auto">
             <TrendsChart trends={trends} />
           </div>
         </div>
-        {/* Card 3: Respuesta mensual */}
+        {/* Card 3: Monthly response */}
         <div className="elegant-card p-6 h-[360px] flex flex-col overflow-hidden">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Tiempo medio de respuesta mensual</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Monthly average response time</h3>
           <div className="flex-1 min-h-0 overflow-auto">
             {monthlyResponse.length === 0 ? (
-              <div className="text-sm text-gray-500">Sin datos aún.</div>
+              <div className="text-sm text-gray-500">No data yet.</div>
             ) : (
               <div className="w-full relative">
                 <MonthlyResponseChart data={monthlyResponse} />

@@ -23,7 +23,7 @@ const COLORS = ['#1677ff','#722ed1','#eb2f96','#fa8c16','#13c2c2','#52c41a','#fa
 interface NewTaskFormValues {
   title: string;
   estimated_hours?: number;
-  due_date: dayjs.Dayjs; // almacenado como Dayjs en formulario
+  due_date: dayjs.Dayjs; // stored as Dayjs in form
   assigned_to: number;
   priority?: TaskPriority;
 }
@@ -54,13 +54,13 @@ export default function PlannerPage() {
       const data = await plannerService.getWeek({ start: monday.format('YYYY-MM-DD'), days: 7 });
       setWeek(data);
     } catch (e) {
-      console.error(e); message.error('Error cargando planner');
+      console.error(e); message.error('Error loading planner');
     } finally { setLoading(false); }
   }, [monday]);
 
   useEffect(()=> { loadWeek(); }, [loadWeek]);
 
-  // Cuando se abre el modal, cargar lista de workorders (primera page)
+  // When modal opens, load workorders list (first page)
   useEffect(() => {
     if (showModal) {
       (async () => {
@@ -81,7 +81,7 @@ export default function PlannerPage() {
   const openCreateTask = (userId: number, date: string) => {
     setSelectedUserId(userId);
     setSelectedDate(date);
-    // calcular horas restantes de la jornada: use capacity_hours si está, si no fallback a DEFAULT_WORKDAY_HOURS
+    // calculate remaining hours of the workday: use capacity_hours if available, otherwise fallback to DEFAULT_WORKDAY_HOURS
     let remaining = DEFAULT_WORKDAY_HOURS;
     try {
       const u = week?.users.find(x => x.user.id === userId);
@@ -93,14 +93,14 @@ export default function PlannerPage() {
       // fallback: keep DEFAULT_WORKDAY_HOURS
     }
     setSelectedMaxHours(remaining);
-    // abrir modal; rellenado real del formulario se hace en useEffect cuando el modal está montado
+    // open modal; actual form filling is done in useEffect when modal is mounted
     setEditingTask(null);
     setShowModal(true);
   };
 
   // (removed overload) openEditTask implemented further below using TaskRead
 
-  // Cuando el modal se abre, asegurar que el formulario reciba los valores (date pickers montados)
+  // When modal opens, ensure form receives values (date pickers mounted)
   useEffect(() => {
     if (showModal && selectedDate) {
       form.resetFields();
@@ -156,14 +156,14 @@ export default function PlannerPage() {
 
       if (!editingTask) {
         await taskService.createTask(payloadCreate);
-        message.success('Tarea creada');
+        message.success('Task created');
       } else {
         await taskService.updateTask(String(editingTask.id), payloadUpdate);
-        message.success('Tarea actualizada');
+        message.success('Task updated');
       }
       setShowModal(false);
       await loadWeek();
-      // limpiar estado del modal
+      // clear modal state
       setSelectedUserId(null);
       setSelectedDate(null);
       setSelectedMaxHours(null);
@@ -187,10 +187,10 @@ export default function PlannerPage() {
         message.error(detail || `Error ${e.status}: ${e.message}`);
       } else if (e instanceof Error) {
         console.error(e);
-        message.error(e.message || 'Error creando tarea');
+        message.error(e.message || 'Error creating task');
       } else {
         console.error('Unknown error', e);
-        message.error('Error creando tarea');
+        message.error('Error creating task');
       }
     }
   };
@@ -198,7 +198,7 @@ export default function PlannerPage() {
   const deleteTask = async (taskId: number) => {
     try {
       await taskService.deleteTask(String(taskId));
-      message.success('Tarea eliminada');
+      message.success('Task deleted');
       await loadWeek();
       if (editingTask && editingTask.id === taskId) {
         setEditingTask(null);
@@ -206,15 +206,15 @@ export default function PlannerPage() {
       }
     } catch (err) {
       console.error('Error deleting task', err);
-      message.error('Error eliminando tarea');
+      message.error('Error deleting task');
     }
   };
 
   const openEditTask = async (t: PlannerTask) => {
     try {
       const res = await taskService.getTask(String(t.id));
-      if (!res.success) throw new Error('Error cargando tarea');
-  if (!res.data) throw new Error('Tarea no encontrada');
+      if (!res.success) throw new Error('Error loading task');
+  if (!res.data) throw new Error('Task not found');
   const full: TaskRead = res.data as TaskRead;
   setEditingTask(full);
   setSelectedUserId(full.assigned_to ?? null);
@@ -247,7 +247,7 @@ export default function PlannerPage() {
       setShowModal(true);
     } catch (err) {
       console.error('Error opening edit task', err);
-      message.error('Error cargando tarea');
+      message.error('Error loading task');
     }
   };
 
@@ -271,34 +271,34 @@ export default function PlannerPage() {
   return (
     <ManagementPageLayout
       kpis={[
-        { title:'Capacidad (h)', value: totalCapacity, prefix:<ClockCircleOutlined /> },
-        { title:'Planificado (h)', value: totalPlanned, prefix:<PieChartOutlined style={{color:'#1677ff'}} /> },
-        { title:'Utilización (%)', value: Number(utilization.toFixed(0)), prefix:<PieChartOutlined style={{color: utilization>90? '#fa541c': utilization>75? '#fa8c16':'#52c41a'}} />, valueStyle:{ color: utilization>90? '#fa541c': utilization>75? '#fa8c16':'#52c41a' } },
-        { title:'No Laborables', value: nonWorkingDays }
+        { title:'Capacity (h)', value: totalCapacity, prefix:<ClockCircleOutlined /> },
+        { title:'Planned (h)', value: totalPlanned, prefix:<PieChartOutlined style={{color:'#1677ff'}} /> },
+        { title:'Utilization (%)', value: Number(utilization.toFixed(0)), prefix:<PieChartOutlined style={{color: utilization>90? '#fa541c': utilization>75? '#fa8c16':'#52c41a'}} />, valueStyle:{ color: utilization>90? '#fa541c': utilization>75? '#fa8c16':'#52c41a' } },
+        { title:'Non-working days', value: nonWorkingDays }
       ]}
       headerActions={null}
     >
       <div className="planner-wrapper" data-loading={loading}>
         <div className="flex items-center justify-between mb-4 relative gap-4">
           <div className="primary-gradient-dark rounded-xl text-primary px-5 py-2 shadow-lg title-card flex items-center gap-3">
-            <h2 className="text-primary font-bold m-0 tracking-wide">Planner Semana {monday.format('DD/MM/YYYY')}</h2>
+            <h2 className="text-primary font-bold m-0 tracking-wide">Week Planner {monday.format('DD/MM/YYYY')}</h2>
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            <Tooltip title="Calendario de disponibilidad">
+            <Tooltip title="Availability calendar">
               <Link href="/planner/calendar">
-                <AppButton variant="primary" size="sm" icon={<CalendarOutlined />}>Calendario</AppButton>
+                <AppButton variant="primary" size="sm" icon={<CalendarOutlined />}>Calendar</AppButton>
               </Link>
             </Tooltip>
-            <AppButton variant="ghost" size="sm" icon={<LeftOutlined />} onClick={handlePrevWeek}>Anterior</AppButton>
-            <AppButton variant="primary" size="sm" onClick={handleToday}>Hoy</AppButton>
-            <AppButton variant="ghost" size="sm" icon={<RightOutlined />} iconRight={null} onClick={handleNextWeek}>Siguiente</AppButton>
+            <AppButton variant="ghost" size="sm" icon={<LeftOutlined />} onClick={handlePrevWeek}>Previous</AppButton>
+            <AppButton variant="primary" size="sm" onClick={handleToday}>Today</AppButton>
+            <AppButton variant="ghost" size="sm" icon={<RightOutlined />} iconRight={null} onClick={handleNextWeek}>Next</AppButton>
           </div>
         </div>
         <div className="planner-scroll">
           <table className="planner-table elegant-table">
             <thead>
               <tr>
-                <th className="planner-user-cell p-2">Usuario</th>
+                <th className="planner-user-cell p-2">User</th>
                 {week && [...Array(week.days).keys()].map(i=> {
                   const d = dayjs(week.start).add(i,'day');
                   const isToday = d.isSame(dayjs(),'day');
@@ -320,11 +320,11 @@ export default function PlannerPage() {
                       <td key={day.date} className={`planner-day-cell align-top p-1 ${nonWorking?'planner-nonworking-cell':''} ${cellSelected ? 'selected' : ''}`} onClick={() => { setSelectedCell({ userId: u.user.id, date: day.date }); setSelectedTaskId(null); }}>
                         <div className={`planner-day-block ${nonWorking?'planner-nonworking-block':''}`}>
                           <div className="planner-cell-actions">
-                            <button className="planner-cell-action-btn" onClick={(e)=>{ e.stopPropagation(); openCreateTask(u.user.id, day.date); }} title="Crear">+</button>
+                            <button className="planner-cell-action-btn" onClick={(e)=>{ e.stopPropagation(); openCreateTask(u.user.id, day.date); }} title="Create">+</button>
                             {day.tasks.length <= 1 ? (
                               <>
-                                <button className="planner-cell-action-btn" onClick={(e)=>{ e.stopPropagation(); if(day.tasks.length>0){ const t = day.tasks[0]; setSelectedTaskId(t.id); openEditTask(t); } }} disabled={day.tasks.length===0} title="Editar">✎</button>
-                                <button className="planner-cell-action-btn" onClick={(e)=>{ e.stopPropagation(); if(day.tasks.length>0){ const t = day.tasks[0]; deleteTask(t.id); } }} disabled={day.tasks.length===0} title="Borrar">🗑</button>
+                                <button className="planner-cell-action-btn" onClick={(e)=>{ e.stopPropagation(); if(day.tasks.length>0){ const t = day.tasks[0]; setSelectedTaskId(t.id); openEditTask(t); } }} disabled={day.tasks.length===0} title="Edit">✎</button>
+                                <button className="planner-cell-action-btn" onClick={(e)=>{ e.stopPropagation(); if(day.tasks.length>0){ const t = day.tasks[0]; deleteTask(t.id); } }} disabled={day.tasks.length===0} title="Delete">🗑</button>
                               </>
                             ) : (
                               <Dropdown
@@ -347,7 +347,7 @@ export default function PlannerPage() {
                             {day.tasks.length <= 1 ? null : (
                               <Dropdown
                                 menu={{
-                                  items: day.tasks.map(t => ({ key: `del-${t.id}`, label: `Borrar: ${t.title}` })),
+                                  items: day.tasks.map(t => ({ key: `del-${t.id}`, label: `Delete: ${t.title}` })),
                                   onClick: ({ key }) => {
                                     const idStr = String(key).replace(/^del-/, '');
                                     const id = Number(idStr);
@@ -375,10 +375,10 @@ export default function PlannerPage() {
                             })}
                             {(!nonWorking && day.free_hours>0) && <div style={{ width:`${freePct}%`}} className="planner-free-bar">{day.free_hours.toFixed(1)}h</div>}
                             {nonWorking && day.tasks.length===0 && (
-                              <div className="planner-nonworking-overlay">{day.reason || 'No laborable'}</div>
+                              <div className="planner-nonworking-overlay">{day.reason || 'Non-working'}</div>
                             )}
                           </div>
-                          {/* Botón flotante de añadir eliminado; las acciones (+, editar, borrar) se muestran al hacer hover en la celda */}
+                          {/* Floating add button removed; actions (+, edit, delete) are shown on cell hover */}
                         </div>
                         <div className="planner-day-meta">{day.planned_hours.toFixed(1)}/{denom.toFixed(1)}h{nonWorking && ' (NL)'}</div>
                       </td>
@@ -386,21 +386,21 @@ export default function PlannerPage() {
                   })}
                 </tr>
               ))}
-              {(!week || week.users.length===0) && <tr><td colSpan={8} className="text-center p-6 text-sm text-gray-500">No hay usuarios subordinados o sin datos.</td></tr>}
+              {(!week || week.users.length===0) && <tr><td colSpan={8} className="text-center p-6 text-sm text-gray-500">No subordinate users or no data.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
 
-      <ModalDialog open={showModal} onClose={handleCloseModal} primary={{ label: 'Guardar', onClick: submitTask }} title={editingTask ? `Editar tarea — ${editingTask.title}` : 'Crear tarea'}>
+      <ModalDialog open={showModal} onClose={handleCloseModal} primary={{ label: 'Save', onClick: submitTask }} title={editingTask ? `Edit task — ${editingTask.title}` : 'Create task'}>
         <Form form={form} layout="vertical" initialValues={{ priority: TaskPriority.MEDIUM }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Form.Item label="Orden de trabajo">
+              <Form.Item label="Work order">
                 <Select
                   showSearch
                   allowClear
-                  placeholder="Buscar workorder por id o título"
+                  placeholder="Search workorder by id or title"
                   optionFilterProp="children"
                   value={selectedWorkOrderId ?? undefined}
                   onChange={async (val) => {
@@ -424,11 +424,11 @@ export default function PlannerPage() {
                 </Select>
               </Form.Item>
 
-              <Form.Item label="Tarea de la orden (plantilla)">
+              <Form.Item label="Order task (template)">
                 <Select
                   showSearch
                   allowClear
-                  placeholder={selectedWorkOrderId ? 'Selecciona una tarea de la OT' : 'Selecciona primero una OT'}
+                  placeholder={selectedWorkOrderId ? 'Select a task from the WO' : 'First select a WO'}
                   disabled={!selectedWorkOrderId}
                   value={selectedTemplateTaskId ?? undefined}
                   onChange={(val) => {
@@ -453,25 +453,25 @@ export default function PlannerPage() {
                   <AppButton size="sm" variant="primary" onClick={() => {
                     setSelectedTemplateTaskId(null);
                     form.setFieldsValue({ title: '', estimated_hours: selectedMaxHours ?? undefined });
-                  }}>Crear nueva tarea</AppButton>
-                  <div className="text-sm text-muted flex-1 self-center">La tarea se creará asignada al usuario y fecha pulsados en la matriz.</div>
+                  }}>Create new task</AppButton>
+                  <div className="text-sm text-muted flex-1 self-center">The task will be created assigned to the user and date clicked in the matrix.</div>
                 </div>
               </Form.Item>
             </div>
 
             <div>
-              <Form.Item name="title" label="Título" rules={[{ required:true, message:'Obligatorio'}]}>
+              <Form.Item name="title" label="Title" rules={[{ required:true, message:'Required'}]}>
                 <Input />
               </Form.Item>
-              <Form.Item name="estimated_hours" label="Horas estimadas">
+              <Form.Item name="estimated_hours" label="Estimated hours">
                 <InputNumber min={0} max={selectedMaxHours ?? DEFAULT_WORKDAY_HOURS} style={{width:'100%'}} />
               </Form.Item>
-              <Form.Item name="priority" label="Prioridad">
+              <Form.Item name="priority" label="Priority">
                 <Select>
-                  <Select.Option value={TaskPriority.LOW}>Baja</Select.Option>
-                  <Select.Option value={TaskPriority.MEDIUM}>Media</Select.Option>
-                  <Select.Option value={TaskPriority.HIGH}>Alta</Select.Option>
-                  <Select.Option value={TaskPriority.CRITICAL}>Crítica</Select.Option>
+                  <Select.Option value={TaskPriority.LOW}>Low</Select.Option>
+                  <Select.Option value={TaskPriority.MEDIUM}>Medium</Select.Option>
+                  <Select.Option value={TaskPriority.HIGH}>High</Select.Option>
+                  <Select.Option value={TaskPriority.CRITICAL}>Critical</Select.Option>
                 </Select>
               </Form.Item>
             </div>
